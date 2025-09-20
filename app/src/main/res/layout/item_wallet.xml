@@ -71,6 +71,30 @@
             android:maxLines="2"
             android:ellipsize="end" />
 
+        <TextView
+            android:id="@+id/textViewPublicKey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Public Key: 0x..."
+            android:textSize="10sp"
+            android:textColor="@android:color/darker_gray"
+            android:fontFamily="monospace"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/textViewPrivateKey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Private Key: 0x..."
+            android:textSize="10sp"
+            android:textColor="@android:color/darker_gray"
+            android:fontFamily="monospace"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

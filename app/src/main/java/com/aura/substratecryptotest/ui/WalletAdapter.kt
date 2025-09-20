@@ -37,6 +37,13 @@ class WalletAdapter(
                 textViewAddress.text = wallet.address
                 textViewDerivationPath.text = wallet.derivationPath
                 textViewMnemonic.text = "Mnemonic: ${wallet.mnemonic}"
+                
+                // Mostrar información del par de claves
+                val publicKeyHex = wallet.publicKey?.joinToString("") { "%02x".format(it) } ?: "N/A"
+                val privateKeyHex = wallet.privateKey?.joinToString("") { "%02x".format(it) } ?: "N/A"
+                
+                textViewPublicKey.text = "Public Key: 0x${publicKeyHex.take(16)}..."
+                textViewPrivateKey.text = "Private Key: 0x${privateKeyHex.take(16)}..."
 
                 buttonSelect.setOnClickListener {
                     onWalletAction(wallet, WalletAction.SELECT)

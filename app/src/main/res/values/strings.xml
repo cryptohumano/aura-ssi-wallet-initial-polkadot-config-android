@@ -4,6 +4,7 @@
     
     <!-- Tabs -->
     <string name="tab_wallets">Wallets</string>
+    <string name="tab_wallet_info">Info Wallet</string>
     <string name="tab_crypto_tools">Herramientas Crypto</string>
     <string name="tab_import_export">Importar/Exportar</string>
     

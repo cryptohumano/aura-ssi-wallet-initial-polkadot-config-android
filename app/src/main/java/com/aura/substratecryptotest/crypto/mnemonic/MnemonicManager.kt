@@ -1,5 +1,6 @@
 package com.aura.substratecryptotest.crypto.mnemonic
 
+import android.util.Log
 import io.novasama.substrate_sdk_android.encrypt.mnemonic.Mnemonic
 import io.novasama.substrate_sdk_android.encrypt.mnemonic.MnemonicCreator
 import kotlinx.coroutines.Dispatchers
@@ -77,9 +78,10 @@ class MnemonicManager {
     
     /**
      * Genera un seed desde un mnemonic y contraseña opcional
+     * Usa el mismo método que el SDK de Substrate (PKCS5S2ParametersGenerator con SHA512)
      * @param mnemonic String con las palabras del mnemonic
      * @param password Contraseña opcional para el seed
-     * @return ByteArray con el seed generado
+     * @return ByteArray con el seed generado (64 bytes)
      */
     suspend fun generateSeed(mnemonic: String, password: String? = null): ByteArray {
         return withContext(Dispatchers.IO) {
@@ -87,17 +89,22 @@ class MnemonicManager {
                 val mnemonicObj = MnemonicCreator.fromWords(normalizeMnemonic(mnemonic))
                 val entropy = mnemonicObj.entropy
                 
-                // Si hay contraseña, aplicar PBKDF2 para derivar el seed
-                if (password != null && password.isNotBlank()) {
-                    val salt = "mnemonic$password".toByteArray()
-                    val keyFactory = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512")
-                    val keySpec = javax.crypto.spec.PBEKeySpec(password.toCharArray(), salt, 2048, 512)
-                    val key = keyFactory.generateSecret(keySpec)
-                    key.encoded
+                // Usar el mismo método que el SDK de Substrate
+                val generator = org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator(
+                    org.bouncycastle.crypto.digests.SHA512Digest()
+                )
+                
+                val salt = if (password != null && password.isNotBlank()) {
+                    "mnemonic$password".toByteArray()
                 } else {
-                    // Sin contraseña, usar el entropy directamente
-                    entropy
+                    "mnemonic".toByteArray()
                 }
+                
+                generator.init(entropy, salt, 2048)
+                val key = generator.generateDerivedMacParameters(64 * 8) as org.bouncycastle.crypto.params.KeyParameter
+                
+                // Retornar solo los primeros 32 bytes para compatibilidad con SR25519
+                key.key.copyOfRange(0, 32)
             } catch (e: Exception) {
                 throw MnemonicException("Error generando seed: ${e.message}", e)
             }

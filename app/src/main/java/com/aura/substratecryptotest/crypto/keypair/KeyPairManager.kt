@@ -1,5 +1,7 @@
 package com.aura.substratecryptotest.crypto.keypair
 
+import android.util.Log
+import com.aura.substratecryptotest.utils.Logger
 import io.novasama.substrate_sdk_android.encrypt.keypair.substrate.Sr25519Keypair
 import io.novasama.substrate_sdk_android.encrypt.keypair.Keypair
 import io.novasama.substrate_sdk_android.encrypt.keypair.substrate.SubstrateKeypairFactory
@@ -66,8 +68,26 @@ class KeyPairManager {
         return withContext(Dispatchers.IO) {
             try {
                 val keyPair = generateKeyPair(EncryptionType.SR25519, mnemonic, password)
-                keyPair?.let { createKeyPairInfo(it, EncryptionAlgorithm.SR25519) }
+                
+                if (keyPair != null) {
+                    val keyPairInfo = createKeyPairInfo(keyPair, EncryptionAlgorithm.SR25519)
+                    
+                    // Verificar si las claves son válidas
+                    if (keyPairInfo.privateKey == null || keyPairInfo.publicKey.isEmpty() || !isValidKeyPair(keyPair)) {
+                        Logger.error("KeyPairManager", "Par de claves inválido", "Claves generadas no son válidas")
+                        return@withContext null
+                    }
+                    
+                    Logger.success("KeyPairManager", "Par de claves SR25519 generado exitosamente", 
+                        "Algoritmo: ${keyPairInfo.algorithm}, Clave pública: ${keyPairInfo.publicKey.size} bytes")
+                    
+                    keyPairInfo
+                } else {
+                    Logger.error("KeyPairManager", "Error generando par de claves SR25519", "No se pudo generar el par de claves")
+                    null
+                }
             } catch (e: Exception) {
+                Logger.error("KeyPairManager", "Excepción generando SR25519", e.message ?: "Error desconocido", e)
                 null
             }
         }
@@ -179,19 +199,30 @@ class KeyPairManager {
     ): KeyPairInfo? {
         return withContext(Dispatchers.IO) {
             try {
+                Log.d("KeyPairManager", "🔍 Generando par de claves desde seed: ${seed.size} bytes")
+                
                 val encryptionType = when (algorithm) {
                     EncryptionAlgorithm.SR25519 -> EncryptionType.SR25519
                     EncryptionAlgorithm.ED25519 -> EncryptionType.ED25519
                     EncryptionAlgorithm.ECDSA -> EncryptionType.ECDSA
                 }
                 
+                Log.d("KeyPairManager", "🔍 Usando EncryptionType: ${encryptionType.rawName}")
+                
                 val keyPair = when (algorithm) {
-                    EncryptionAlgorithm.SR25519 -> SubstrateKeypairFactory.generate(EncryptionType.SR25519, seed)
-                    EncryptionAlgorithm.ED25519 -> SubstrateKeypairFactory.generate(EncryptionType.ED25519, seed)
+                    EncryptionAlgorithm.SR25519 -> SubstrateKeypairFactory.generate(EncryptionType.SR25519, seed, emptyList())
+                    EncryptionAlgorithm.ED25519 -> SubstrateKeypairFactory.generate(EncryptionType.ED25519, seed, emptyList())
                     EncryptionAlgorithm.ECDSA -> null // ECDSA no está disponible en el SDK
+                }
+                
+                if (keyPair != null) {
+                    Log.d("KeyPairManager", "🔍 KeyPair generado exitosamente")
+                } else {
+                    Log.e("KeyPairManager", "❌ Error generando KeyPair")
                 }
                 keyPair?.let { createKeyPairInfo(it, algorithm) }
             } catch (e: Exception) {
+                Log.e("KeyPairManager", "❌ Excepción en generateKeyPairFromSeed: ${e.message}")
                 null
             }
         }
@@ -202,11 +233,9 @@ class KeyPairManager {
      * @param keyPair Par de claves
      * @return ByteArray con la clave pública
      */
-    fun getPublicKey(keyPair: Keypair): ByteArray? {
+    fun extractPublicKey(keyPair: Keypair): ByteArray? {
         return try {
-            // TODO: Implementar usando la API pública del SDK
-            // Por ahora retornamos null hasta tener acceso a la API correcta
-            null
+            keyPair.publicKey
         } catch (e: Exception) {
             null
         }
@@ -217,11 +246,9 @@ class KeyPairManager {
      * @param keyPair Par de claves
      * @return ByteArray con la clave privada
      */
-    fun getPrivateKey(keyPair: Keypair): ByteArray? {
+    fun extractPrivateKey(keyPair: Keypair): ByteArray? {
         return try {
-            // TODO: Implementar usando la API pública del SDK
-            // Por ahora retornamos null hasta tener acceso a la API correcta
-            null
+            keyPair.privateKey
         } catch (e: Exception) {
             null
         }
@@ -234,9 +261,9 @@ class KeyPairManager {
      */
     fun isValidKeyPair(keyPair: Keypair): Boolean {
         return try {
-            // TODO: Implementar validación real
-            // Por ahora retornamos true
-            true
+            val publicKey = keyPair.publicKey
+            val privateKey = keyPair.privateKey
+            publicKey != null && privateKey != null && publicKey.isNotEmpty() && privateKey.isNotEmpty()
         } catch (e: Exception) {
             false
         }
@@ -258,11 +285,15 @@ class KeyPairManager {
             try {
                 val mnemonicObj = MnemonicCreator.fromWords(mnemonic)
                 val entropy = mnemonicObj.entropy
-                // Implementación temporal hasta que generateSeed esté disponible en el SDK
-                val seed = entropy // Usar entropy como seed temporalmente
                 
-                SubstrateKeypairFactory.generate(encryptionType, seed)
+                // Generar seed de 32 bytes usando nuestro MnemonicManager (PKCS5S2ParametersGenerator con SHA512)
+                val mnemonicManager = com.aura.substratecryptotest.crypto.mnemonic.MnemonicManager()
+                val seed = mnemonicManager.generateSeed(mnemonic, password)
+                
+                val keyPair = SubstrateKeypairFactory.generate(encryptionType, seed, emptyList())
+                keyPair
             } catch (e: Exception) {
+                Logger.error("KeyPairManager", "Excepción en generateKeyPair", e.message ?: "Error desconocido", e)
                 null
             }
         }
@@ -331,11 +362,14 @@ class KeyPairManager {
      * @return KeyPairInfo con la información
      */
     private fun createKeyPairInfo(keyPair: Keypair, algorithm: EncryptionAlgorithm): KeyPairInfo {
+        val publicKey = extractPublicKey(keyPair)
+        val privateKey = extractPrivateKey(keyPair)
+        
         return KeyPairInfo(
             keyPair = keyPair,
             algorithm = algorithm,
-            publicKey = getPublicKey(keyPair) ?: ByteArray(0),
-            privateKey = getPrivateKey(keyPair),
+            publicKey = publicKey ?: ByteArray(0),
+            privateKey = privateKey,
             address = null // Se puede calcular después con SS58Encoder
         )
     }

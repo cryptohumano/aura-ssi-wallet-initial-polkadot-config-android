@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.aura.substratecryptotest.MainActivity
 import com.aura.substratecryptotest.R
 import com.aura.substratecryptotest.databinding.FragmentWalletListBinding
 import com.aura.substratecryptotest.wallet.Wallet
@@ -22,10 +23,8 @@ class WalletListFragment : Fragment() {
     private lateinit var walletAdapter: WalletAdapter
 
     companion object {
-        fun newInstance(walletManager: WalletManager): WalletListFragment {
-            val fragment = WalletListFragment()
-            fragment.walletManager = walletManager
-            return fragment
+        fun newInstance(): WalletListFragment {
+            return WalletListFragment()
         }
     }
 
@@ -40,6 +39,10 @@ class WalletListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        
+        // Obtener WalletManager desde la actividad principal
+        walletManager = (activity as? MainActivity)?.walletManager 
+            ?: throw IllegalArgumentException("WalletManager es requerido")
         
         setupRecyclerView()
         observeWalletManager()

@@ -1,6 +1,8 @@
 package com.aura.substratecryptotest.crypto.ss58
 
-// SS58 no está disponible en el SDK, implementación temporal
+import io.novasama.substrate_sdk_android.ss58.SS58Encoder.toAddress
+import io.novasama.substrate_sdk_android.ss58.SS58Encoder.toAccountId
+import io.novasama.substrate_sdk_android.ss58.SS58Encoder.addressPrefix
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -19,7 +21,7 @@ class SS58Encoder {
         SUBSTRATE(42, "Substrate"),
         WESTEND(42, "Westend"),
         ROCOCO(42, "Rococo"),
-        AURA(42, "Aura"),
+        KILT(38, "Kilt"),
         CUSTOM(42, "Custom")
     }
     
@@ -67,8 +69,8 @@ class SS58Encoder {
     suspend fun encode(publicKey: ByteArray, networkPrefix: NetworkPrefix = NetworkPrefix.SUBSTRATE): String {
         return withContext(Dispatchers.IO) {
             try {
-                // Implementación temporal hasta que SS58 esté disponible en el SDK
-                "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY" // Dirección de ejemplo
+                // Usar el SDK real de Substrate
+                publicKey.toAddress(networkPrefix.value.toShort())
             } catch (e: Exception) {
                 throw SS58Exception("Error codificando dirección SS58: ${e.message}", e)
             }
@@ -83,8 +85,8 @@ class SS58Encoder {
     suspend fun decode(address: String): ByteArray {
         return withContext(Dispatchers.IO) {
             try {
-                // Implementación temporal hasta que SS58 esté disponible en el SDK
-                ByteArray(32) // Clave pública de ejemplo
+                // Usar el SDK real de Substrate
+                address.toAccountId()
             } catch (e: Exception) {
                 throw SS58Exception("Error decodificando dirección SS58: ${e.message}", e)
             }
@@ -131,8 +133,9 @@ class SS58Encoder {
     suspend fun validateAddress(address: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                // Implementación temporal hasta que SS58 esté disponible en el SDK
-                address.isNotEmpty()
+                // Usar el SDK real de Substrate para validar
+                val accountId = address.toAccountId()
+                accountId.isNotEmpty()
             } catch (e: Exception) {
                 false
             }
@@ -147,8 +150,14 @@ class SS58Encoder {
     suspend fun getNetworkPrefix(address: String): NetworkPrefix {
         return withContext(Dispatchers.IO) {
             try {
-                // Implementación temporal hasta que SS58 esté disponible en el SDK
-                NetworkPrefix.SUBSTRATE
+                // Usar el SDK real de Substrate para obtener el prefijo
+                val prefix = address.addressPrefix()
+                when (prefix) {
+                    0.toShort() -> NetworkPrefix.POLKADOT
+                    2.toShort() -> NetworkPrefix.KUSAMA
+                    42.toShort() -> NetworkPrefix.SUBSTRATE
+                    else -> NetworkPrefix.CUSTOM
+                }
             } catch (e: Exception) {
                 NetworkPrefix.CUSTOM
             }
@@ -254,7 +263,7 @@ class SS58Encoder {
             NetworkPrefix.SUBSTRATE -> "Red de desarrollo Substrate"
             NetworkPrefix.WESTEND -> "Red de test de Polkadot"
             NetworkPrefix.ROCOCO -> "Red de test de parachains"
-            NetworkPrefix.AURA -> "Red de Aura"
+            NetworkPrefix.KILT -> "Red de Kilt"
             NetworkPrefix.CUSTOM -> "Red personalizada"
         }
     }
