@@ -1,0 +1,92 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+
+android {
+    namespace 'com.aura.substratecryptotest'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.aura.substratecryptotest"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    
+    kotlin {
+        jvmToolchain(17)
+    }
+    
+    buildFeatures {
+        viewBinding true
+    }
+    
+    packagingOptions {
+        exclude 'META-INF/DEPENDENCIES'
+        exclude 'META-INF/LICENSE'
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/license.txt'
+        exclude 'META-INF/NOTICE'
+        exclude 'META-INF/NOTICE.txt'
+        exclude 'META-INF/notice.txt'
+        exclude 'META-INF/ASL2.0'
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    // ===== ANDROID CORE =====
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.10.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.7.0'
+    implementation 'androidx.activity:activity-ktx:1.8.0'
+    implementation 'androidx.fragment:fragment-ktx:1.6.2'
+    implementation 'androidx.viewpager2:viewpager2:1.0.0'
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+
+    // ===== SUBSTRATE SDK =====
+    implementation 'io.github.nova-wallet:substrate-sdk-android:2.4.0'
+    
+    // ===== DEPENDENCIAS REQUERIDAS POR EL SDK =====
+    // (Basadas en el POM del SDK - scope=runtime, necesitamos implementation)
+    implementation 'com.google.code.gson:gson:2.10.1'  // Versión actualizada
+    implementation 'org.bouncycastle:bcprov-jdk15on:1.70'  // Versión actualizada
+    implementation 'net.i2p.crypto:eddsa:0.3.0'
+    implementation 'org.lz4:lz4-java:1.7.1'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4'  // Versión actualizada
+    implementation 'org.web3j:crypto:4.8.0'
+    implementation 'org.eclipse.birt.runtime.3_7_1:org.apache.xerces:2.9.0'
+    
+    // ===== DEPENDENCIAS OPCIONALES DEL SDK =====
+    implementation 'com.caverock:androidsvg-aar:1.4'
+    implementation 'com.neovisionaries:nv-websocket-client:2.10'
+    implementation 'io.github.novacrypto:SecureString:2022.01.17'
+    
+    // ===== DEPENDENCIAS DE TESTING =====
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
+

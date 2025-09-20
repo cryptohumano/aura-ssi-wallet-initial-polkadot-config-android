@@ -1,0 +1,5 @@
+rootProject.name = "substrate-crypto-test"
+include ':app'
+include ':substrate-sdk-android'
+
+project(':substrate-sdk-android').projectDir = new File('substrate-sdk-android')

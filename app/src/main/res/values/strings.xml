@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Substrate Crypto Test</string>
+    
+    <!-- Tabs -->
+    <string name="tab_wallets">Wallets</string>
+    <string name="tab_crypto_tools">Herramientas Crypto</string>
+    <string name="tab_import_export">Importar/Exportar</string>
+    
+    <!-- Wallet Management -->
+    <string name="create_wallet">Crear Wallet</string>
+    <string name="import_wallet">Importar Wallet</string>
+    <string name="export_wallet">Exportar Wallet</string>
+    <string name="delete_wallet">Eliminar Wallet</string>
+    <string name="select_wallet">Seleccionar Wallet</string>
+    
+    <!-- Crypto Tools -->
+    <string name="generate_mnemonic">Generar Mnemonic</string>
+    <string name="validate_mnemonic">Validar Mnemonic</string>
+    <string name="generate_hash">Generar Hash</string>
+    <string name="sign_message">Firmar Mensaje</string>
+    
+    <!-- Hash Types -->
+    <string name="hash_sha256">SHA256</string>
+    <string name="hash_keccak256">Keccak256</string>
+    <string name="hash_blake2b256">Blake2b256</string>
+    <string name="hash_blake2b512">Blake2b512</string>
+    <string name="hash_xxhash64">XXHash64</string>
+    <string name="hash_xxhash128">XXHash128</string>
+    
+    <!-- Mnemonic Lengths -->
+    <string name="mnemonic_12_words">12 palabras</string>
+    <string name="mnemonic_15_words">15 palabras</string>
+    <string name="mnemonic_18_words">18 palabras</string>
+    <string name="mnemonic_21_words">21 palabras</string>
+    <string name="mnemonic_24_words">24 palabras</string>
+    
+    <!-- Crypto Types -->
+    <string name="crypto_sr25519">SR25519</string>
+    <string name="crypto_ed25519">ED25519</string>
+    <string name="crypto_ecdsa">ECDSA</string>
+    
+    <!-- Messages -->
+    <string name="wallet_created_successfully">Wallet creado exitosamente</string>
+    <string name="wallet_imported_successfully">Wallet importado exitosamente</string>
+    <string name="wallet_exported_successfully">Wallet exportado exitosamente</string>
+    <string name="wallet_deleted_successfully">Wallet eliminado exitosamente</string>
+    <string name="mnemonic_generated_successfully">Mnemonic generado exitosamente</string>
+    <string name="mnemonic_valid">Mnemonic válido</string>
+    <string name="mnemonic_invalid">Mnemonic inválido</string>
+    <string name="hash_generated_successfully">Hash generado exitosamente</string>
+    <string name="message_signed_successfully">Mensaje firmado exitosamente</string>
+    
+    <!-- Errors -->
+    <string name="error_generic">Ha ocurrido un error</string>
+    <string name="error_invalid_mnemonic">Mnemonic inválido</string>
+    <string name="error_no_wallet_selected">No hay wallet seleccionado</string>
+    <string name="error_import_failed">Error al importar wallet</string>
+    <string name="error_export_failed">Error al exportar wallet</string>
+    
+    <!-- Hints -->
+    <string name="hint_wallet_name">Nombre del wallet</string>
+    <string name="hint_password">Contraseña (opcional)</string>
+    <string name="hint_mnemonic">Mnemonic</string>
+    <string name="hint_message">Mensaje</string>
+    <string name="hint_data">Datos</string>
+    <string name="hint_json">JSON</string>
+    
+    <!-- Empty States -->
+    <string name="no_wallets_created">No hay wallets creados</string>
+    <string name="no_wallet_selected">No hay wallet seleccionado</string>
+    
+</resources>
