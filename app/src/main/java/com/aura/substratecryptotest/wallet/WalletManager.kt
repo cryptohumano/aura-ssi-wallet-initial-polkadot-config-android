@@ -93,19 +93,24 @@ class WalletManager(context: Context) : ViewModel() {
                     return@launch
                 }
                 
-                // Crear wallet con datos reales
-                val address = generateAddress(keyPairInfo.publicKey)
+                // Generar direcciones para múltiples parachains
+                val addresses = generateMultipleAddresses(keyPairInfo.publicKey)
+                val mainAddress = addresses[SS58Encoder.NetworkPrefix.SUBSTRATE] ?: generateAddress(keyPairInfo.publicKey)
+                
                 val wallet = Wallet(
                     id = generateWalletId(),
                     name = name,
                     mnemonic = mnemonic,
                     publicKey = keyPairInfo.publicKey,
                     privateKey = keyPairInfo.privateKey,
-                    address = address,
+                    address = mainAddress,
                     cryptoType = cryptoType,
                     derivationPath = "", // TODO: Implementar JunctionCoder para paths reales
                     createdAt = System.currentTimeMillis(),
-                    metadata = emptyMap()
+                    metadata = mapOf(
+                        "addresses" to addresses,
+                        "parachain_count" to addresses.size
+                    )
                 )
                 
                 val currentWallets = _wallets.value?.toMutableList() ?: mutableListOf()
@@ -227,6 +232,43 @@ class WalletManager(context: Context) : ViewModel() {
     }
     
     /**
+     * Obtiene todas las direcciones de parachains de la wallet actual
+     */
+    fun getCurrentWalletParachainAddresses(): Map<SS58Encoder.NetworkPrefix, String>? {
+        val wallet = _currentWallet.value ?: return null
+        @Suppress("UNCHECKED_CAST")
+        return wallet.metadata["addresses"] as? Map<SS58Encoder.NetworkPrefix, String>
+    }
+    
+    /**
+     * Obtiene la dirección de una parachain específica de la wallet actual
+     */
+    fun getCurrentWalletParachainAddress(networkPrefix: SS58Encoder.NetworkPrefix): String? {
+        return getCurrentWalletParachainAddresses()?.get(networkPrefix)
+    }
+    
+    /**
+     * Obtiene la dirección KILT de la wallet actual
+     */
+    fun getCurrentWalletKiltAddress(): String? {
+        return getCurrentWalletParachainAddress(SS58Encoder.NetworkPrefix.KILT)
+    }
+    
+    /**
+     * Obtiene la dirección Polkadot de la wallet actual
+     */
+    fun getCurrentWalletPolkadotAddress(): String? {
+        return getCurrentWalletParachainAddress(SS58Encoder.NetworkPrefix.POLKADOT)
+    }
+    
+    /**
+     * Obtiene la dirección Kusama de la wallet actual
+     */
+    fun getCurrentWalletKusamaAddress(): String? {
+        return getCurrentWalletParachainAddress(SS58Encoder.NetworkPrefix.KUSAMA)
+    }
+    
+    /**
      * Obtiene información completa de la wallet actual
      */
     fun getCurrentWalletInfo(): WalletInfo? {
@@ -235,7 +277,7 @@ class WalletManager(context: Context) : ViewModel() {
             id = wallet.id,
             name = wallet.name,
             mnemonic = wallet.mnemonic,
-            publicKey = wallet.publicKey.joinToString("") { "%02x".format(it) },
+            publicKey = wallet.publicKey?.joinToString("") { "%02x".format(it) } ?: "N/A",
             address = wallet.address,
             cryptoType = wallet.cryptoType,
             derivationPath = wallet.derivationPath,
@@ -250,6 +292,34 @@ class WalletManager(context: Context) : ViewModel() {
         return "wallet_${System.currentTimeMillis()}"
     }
     
+    
+    /**
+     * Genera direcciones para múltiples parachains principales
+     */
+    private suspend fun generateMultipleAddresses(publicKey: ByteArray): Map<SS58Encoder.NetworkPrefix, String> {
+        return try {
+            val parachains = listOf(
+                SS58Encoder.NetworkPrefix.POLKADOT,
+                SS58Encoder.NetworkPrefix.KUSAMA,
+                SS58Encoder.NetworkPrefix.SUBSTRATE,
+                SS58Encoder.NetworkPrefix.KILT,
+                SS58Encoder.NetworkPrefix.ACALA,
+                SS58Encoder.NetworkPrefix.MOONBEAM,
+                SS58Encoder.NetworkPrefix.ASTAR
+            )
+            
+            val addresses = ss58Encoder.generateAddressesForNetworks(publicKey, parachains)
+            
+            Logger.success("WalletManager", "Direcciones generadas para ${addresses.size} parachains", 
+                "Parachains: ${addresses.keys.joinToString { it.networkName }}")
+            
+            addresses
+        } catch (e: Exception) {
+            Logger.error("WalletManager", "Error generando direcciones múltiples", e.message ?: "Error desconocido", e)
+            // Fallback: solo dirección Substrate
+            mapOf(SS58Encoder.NetworkPrefix.SUBSTRATE to generateAddress(publicKey))
+        }
+    }
     
     /**
      * Genera una dirección SS58 usando el SS58Encoder

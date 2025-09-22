@@ -332,6 +332,120 @@
 
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- SS58 Parachain Addresses Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🌐 Direcciones de Parachains"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="12dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Genera direcciones SS58 para diferentes parachains usando tu clave pública"
+                        android:textSize="12sp"
+                        android:textColor="@android:color/darker_gray"
+                        android:layout_marginBottom="8dp" />
+
+                    <!-- Parachain Addresses Info -->
+                    <TextView
+                        android:id="@+id/textParachainInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="No hay direcciones de parachains disponibles"
+                        android:textSize="12sp"
+                        android:textColor="@android:color/darker_gray"
+                        android:background="@android:color/white"
+                        android:padding="8dp"
+                        android:layout_marginBottom="16dp"
+                        android:fontFamily="monospace" />
+
+                    <!-- Parachain Buttons Grid -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginBottom="8dp">
+
+                        <!-- Row 1: Main Networks -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="8dp">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnGeneratePolkadotAddress"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="4dp"
+                                android:text="Polkadot"
+                                android:textSize="12sp"
+                                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnGenerateKusamaAddress"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="4dp"
+                                android:text="Kusama"
+                                android:textSize="12sp"
+                                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                        </LinearLayout>
+
+                        <!-- Row 2: Parachains -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="8dp">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnGenerateKiltAddress"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="4dp"
+                                android:text="KILT"
+                                android:textSize="12sp"
+                                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnGenerateAllAddresses"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="4dp"
+                                android:text="Todas"
+                                android:textSize="12sp"
+                                style="@style/Widget.Material3.Button" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- Refresh Button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRefresh"

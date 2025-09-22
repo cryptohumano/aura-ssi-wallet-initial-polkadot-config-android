@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.aura.substratecryptotest.R
 import com.aura.substratecryptotest.databinding.ItemWalletBinding
 import com.aura.substratecryptotest.wallet.Wallet
+import com.aura.substratecryptotest.crypto.ss58.SS58Encoder
 
 class WalletAdapter(
     private val onWalletAction: (Wallet, WalletAction) -> Unit
@@ -39,11 +40,22 @@ class WalletAdapter(
                 textViewMnemonic.text = "Mnemonic: ${wallet.mnemonic}"
                 
                 // Mostrar información del par de claves
-                val publicKeyHex = wallet.publicKey?.joinToString("") { "%02x".format(it) } ?: "N/A"
-                val privateKeyHex = wallet.privateKey?.joinToString("") { "%02x".format(it) } ?: "N/A"
+                val publicKeyHex = if (wallet.publicKey != null) {
+                    wallet.publicKey.joinToString("") { "%02x".format(it) }
+                } else {
+                    "N/A"
+                }
+                val privateKeyHex = if (wallet.privateKey != null) {
+                    wallet.privateKey.joinToString("") { "%02x".format(it) }
+                } else {
+                    "N/A"
+                }
                 
                 textViewPublicKey.text = "Public Key: 0x${publicKeyHex.take(16)}..."
                 textViewPrivateKey.text = "Private Key: 0x${privateKeyHex.take(16)}..."
+                
+                // Mostrar información de parachains
+                displayParachainInfo(wallet)
 
                 buttonSelect.setOnClickListener {
                     onWalletAction(wallet, WalletAction.SELECT)
@@ -56,6 +68,35 @@ class WalletAdapter(
                 buttonDelete.setOnClickListener {
                     onWalletAction(wallet, WalletAction.DELETE)
                 }
+            }
+        }
+        
+        /**
+         * Muestra información de parachains en el item de wallet
+         */
+        private fun displayParachainInfo(wallet: Wallet) {
+            @Suppress("UNCHECKED_CAST")
+            val parachainAddresses = wallet.metadata["addresses"] as? Map<SS58Encoder.NetworkPrefix, String>
+            
+            if (parachainAddresses != null && parachainAddresses.isNotEmpty()) {
+                val parachainCount = parachainAddresses.size
+                val parachainNames = parachainAddresses.keys.joinToString(", ") { it.networkName }
+                
+                // Mostrar información de parachains si el TextView existe
+                binding.textViewParachainInfo.text = "🌐 $parachainCount parachains: $parachainNames"
+                
+                // Mostrar direcciones específicas si están disponibles
+                val kiltAddress = parachainAddresses[SS58Encoder.NetworkPrefix.KILT]
+                val polkadotAddress = parachainAddresses[SS58Encoder.NetworkPrefix.POLKADOT]
+                
+                if (kiltAddress != null) {
+                    binding.textViewKiltAddress.text = "KILT: ${kiltAddress.take(20)}..."
+                }
+                if (polkadotAddress != null) {
+                    binding.textViewPolkadotAddress.text = "Polkadot: ${polkadotAddress.take(20)}..."
+                }
+            } else {
+                binding.textViewParachainInfo.text = "🌐 No hay direcciones de parachains"
             }
         }
     }

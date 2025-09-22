@@ -14,6 +14,7 @@ import com.aura.substratecryptotest.databinding.ActivityMainBinding
 import com.aura.substratecryptotest.ui.WalletListFragment
 import com.aura.substratecryptotest.ui.WalletInfoFragment
 import com.aura.substratecryptotest.ui.ImportExportFragment
+import com.aura.substratecryptotest.ui.SS58ToolsFragment
 import com.aura.substratecryptotest.utils.Logger
 // import com.aura.substratecryptotest.ui.SDKVerificationFragment
 // import com.aura.substratecryptotest.crypto.SubstrateCryptoManager
@@ -52,6 +53,7 @@ class MainActivity : AppCompatActivity() {
                 0 -> getString(R.string.tab_wallets)
                 1 -> getString(R.string.tab_wallet_info)
                 2 -> getString(R.string.tab_import_export)
+                3 -> "SS58 Tools"
                 else -> ""
             }
         }.attach()
@@ -188,13 +190,14 @@ class MainActivity : AppCompatActivity() {
     // }
 
     private inner class ViewPagerAdapter(activity: AppCompatActivity) : FragmentStateAdapter(activity) {
-        override fun getItemCount(): Int = 3
+        override fun getItemCount(): Int = 4
 
         override fun createFragment(position: Int): Fragment {
             return when (position) {
                 0 -> WalletListFragment.newInstance()
                 1 -> WalletInfoFragment.newInstance()
                 2 -> ImportExportFragment.newInstance()
+                3 -> SS58ToolsFragment.newInstance()
                 else -> throw IllegalArgumentException("Invalid position: $position")
             }
         }
