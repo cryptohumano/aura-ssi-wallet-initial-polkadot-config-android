@@ -426,11 +426,100 @@ class WalletInfoFragment : Fragment() {
             
             // Mostrar comparación de direcciones
             showAddressComparison(walletInfo.address, walletInfo.kiltAddress)
+            
+            // Agregar botón de prueba de encriptación
+            binding.btnTestEncryption.visibility = View.VISIBLE
+            binding.btnTestEncryption.setOnClickListener {
+                testEncryptionManager()
+            }
         } else {
             binding.textKiltDidInfo.text = "DID no derivado aún"
             binding.textKiltDidAddress.text = "KILT (//did//0): No disponible"
             binding.btnDeriveKiltDid.text = "Derivar DID"
             binding.btnDeriveKiltDid.isEnabled = true
+        }
+    }
+    
+    /**
+     * Prueba el EncryptionKeyManager con datos reales
+     */
+    private fun testEncryptionManager() {
+        val currentWallet = walletManager.currentWallet.value
+        if (currentWallet == null) {
+            showErrorDialog("Error", "No hay wallet disponible para probar encriptación")
+            return
+        }
+        
+        // Mostrar loading
+        binding.btnTestEncryption.isEnabled = false
+        binding.btnTestEncryption.text = "Probando..."
+        
+        // Ejecutar prueba en background
+        lifecycleScope.launch {
+            try {
+                Logger.debug("WalletInfoFragment", "🧪 Iniciando prueba de EncryptionKeyManager", "Wallet: ${currentWallet.name}")
+                
+                // Crear EncryptionKeyManager
+                val encryptionKeyManager = com.aura.substratecryptotest.crypto.encryption.EncryptionKeyManager(requireContext())
+                
+                // Generar salt
+                val salt = encryptionKeyManager.generateSalt()
+                Logger.debug("WalletInfoFragment", "✅ Salt generado", "Size: ${salt.size} bytes")
+                
+                // Generar encryption key usando el DID
+                val kiltDid = walletManager.getCurrentWalletKiltDid()
+                if (kiltDid != null) {
+                    val encryptionKey = encryptionKeyManager.generateEncryptionKeyFromDid(kiltDid, salt)
+                    
+                    if (encryptionKey != null) {
+                        Logger.success("WalletInfoFragment", "✅ Encryption key generada", "Size: ${encryptionKey.size} bytes")
+                        
+                        // Probar encriptación/desencriptación
+                        val testChallenge = "test_challenge_${System.currentTimeMillis()}"
+                        val encryptionResult = encryptionKeyManager.encryptChallenge(testChallenge, encryptionKey)
+                        
+                        if (encryptionResult != null) {
+                            val (encryptedChallenge, nonce) = encryptionResult
+                            Logger.success("WalletInfoFragment", "✅ Challenge encriptado", "Size: ${encryptedChallenge.size} bytes")
+                            
+                            val decryptedChallenge = encryptionKeyManager.decryptChallenge(encryptedChallenge, nonce, encryptionKey)
+                            
+                            if (decryptedChallenge == testChallenge) {
+                                Logger.success("WalletInfoFragment", "✅ Challenge desencriptado correctamente", "Match: $decryptedChallenge")
+                                
+                                // Mostrar resultado exitoso
+                                showSuccessDialog(
+                                    "Prueba de Encriptación Exitosa",
+                                    "✅ Encryption key generada: ${encryptionKey.size} bytes\n" +
+                                    "✅ Challenge encriptado: ${encryptedChallenge.size} bytes\n" +
+                                    "✅ Challenge desencriptado: $decryptedChallenge\n" +
+                                    "✅ DID usado: ${kiltDid.take(20)}..."
+                                )
+                            } else {
+                                Logger.error("WalletInfoFragment", "❌ Challenge desencriptado incorrectamente", "Expected: $testChallenge, Got: $decryptedChallenge", null)
+                                showErrorDialog("Error", "Challenge desencriptado incorrectamente")
+                            }
+                        } else {
+                            Logger.error("WalletInfoFragment", "❌ Error encriptando challenge", "No se pudo encriptar", null)
+                            showErrorDialog("Error", "No se pudo encriptar el challenge")
+                        }
+                    } else {
+                        Logger.error("WalletInfoFragment", "❌ Error generando encryption key", "No se pudo generar", null)
+                        showErrorDialog("Error", "No se pudo generar la encryption key")
+                    }
+                } else {
+                    Logger.error("WalletInfoFragment", "❌ No hay DID KILT disponible", "Derivar DID primero", null)
+                    showErrorDialog("Error", "No hay DID KILT disponible. Deriva el DID primero.")
+                }
+                
+            } catch (e: Exception) {
+                Logger.error("WalletInfoFragment", "❌ Error en prueba de encriptación", e.message ?: "Error desconocido", e)
+                showErrorDialog("Error en prueba", e.message ?: "Error desconocido")
+            } finally {
+                // Restaurar botón
+                binding.btnTestEncryption.isEnabled = true
+                binding.btnTestEncryption.text = "Probar Encriptación"
+            }
         }
     }
     
