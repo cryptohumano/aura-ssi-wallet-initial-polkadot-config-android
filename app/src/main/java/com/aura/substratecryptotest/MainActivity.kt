@@ -15,6 +15,9 @@ import com.aura.substratecryptotest.ui.WalletListFragment
 import com.aura.substratecryptotest.ui.WalletInfoFragment
 import com.aura.substratecryptotest.ui.ImportExportFragment
 import com.aura.substratecryptotest.ui.SS58ToolsFragment
+import com.aura.substratecryptotest.ui.NetworkStatusFragment
+import com.aura.substratecryptotest.ui.SigningFragment
+import com.aura.substratecryptotest.ui.TestCryptoFragment
 import com.aura.substratecryptotest.utils.Logger
 // import com.aura.substratecryptotest.ui.SDKVerificationFragment
 // import com.aura.substratecryptotest.crypto.SubstrateCryptoManager
@@ -28,6 +31,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     lateinit var walletManager: com.aura.substratecryptotest.wallet.WalletManager
+    lateinit var networkManager: com.aura.substratecryptotest.network.NetworkManager
     // private lateinit var cryptoManager: SubstrateCryptoManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,6 +41,7 @@ class MainActivity : AppCompatActivity() {
 
         // Inicializar gestores
         walletManager = com.aura.substratecryptotest.wallet.WalletManager(this)
+        networkManager = com.aura.substratecryptotest.network.NetworkManager(this)
         // cryptoManager = SubstrateCryptoManager()
 
         setupViewPager()
@@ -54,6 +59,9 @@ class MainActivity : AppCompatActivity() {
                 1 -> getString(R.string.tab_wallet_info)
                 2 -> getString(R.string.tab_import_export)
                 3 -> "SS58 Tools"
+                4 -> "Redes"
+                5 -> "Firmar"
+                6 -> "Prueba ETH"
                 else -> ""
             }
         }.attach()
@@ -100,11 +108,30 @@ class MainActivity : AppCompatActivity() {
             // Mostrar información básica en logs
             Logger.i("MainActivity", "Wallet creada exitosamente: ${walletInfo.name}")
             
+            // Mostrar información de DIDs KILT si están disponibles
+            if (walletInfo.kiltDid != null) {
+                Logger.success("MainActivity", "🆔 DID KILT generado", walletInfo.kiltDid)
+                Logger.debug("MainActivity", "Dirección KILT", walletInfo.kiltAddress ?: "N/A")
+                
+                if (walletInfo.kiltDids != null && walletInfo.kiltDids.isNotEmpty()) {
+                    Logger.debug("MainActivity", "DIDs KILT disponibles", 
+                        walletInfo.kiltDids.keys.joinToString(", "))
+                }
+            } else {
+                Logger.warning("MainActivity", "⚠️ No se generaron DIDs KILT", 
+                    "La wallet se creó sin soporte KILT")
+            }
+            
             // Copiar automáticamente el mnemonic al portapapeles
             copyToClipboard("Mnemonic", walletInfo.mnemonic)
             
-            // Mostrar toast de confirmación
-            Toast.makeText(this, "✅ Wallet creada: ${walletInfo.name}", Toast.LENGTH_LONG).show()
+            // Mostrar toast de confirmación con información KILT
+            val kiltInfo = if (walletInfo.kiltDid != null) {
+                "\n🆔 DID KILT: ${walletInfo.kiltDid.take(20)}..."
+            } else {
+                "\n⚠️ Sin DIDs KILT"
+            }
+            Toast.makeText(this, "✅ Wallet creada: ${walletInfo.name}$kiltInfo", Toast.LENGTH_LONG).show()
         } else {
             Logger.e("MainActivity", "No hay wallet actual disponible")
             Toast.makeText(this, "❌ Error creando wallet", Toast.LENGTH_SHORT).show()
@@ -165,6 +192,30 @@ class MainActivity : AppCompatActivity() {
     }
     
     /**
+     * Copia el DID KILT de la wallet actual
+     */
+    fun copyCurrentWalletKiltDid() {
+        val kiltDid = walletManager.getCurrentWalletKiltDid()
+        if (kiltDid != null) {
+            copyToClipboard("DID KILT", kiltDid)
+        } else {
+            Toast.makeText(this, "❌ No hay DID KILT disponible", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    /**
+     * Copia la dirección KILT de la wallet actual
+     */
+    fun copyCurrentWalletKiltAddress() {
+        val kiltAddress = walletManager.getCurrentWalletKiltAddress()
+        if (kiltAddress != null) {
+            copyToClipboard("Dirección KILT", kiltAddress)
+        } else {
+            Toast.makeText(this, "❌ No hay dirección KILT disponible", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    /**
      * Configura el sistema de logging según el modo de compilación
      */
     private fun setupLogging() {
@@ -178,6 +229,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
+    override fun onDestroy() {
+        super.onDestroy()
+        // Limpiar recursos del NetworkManager
+        networkManager.cleanup()
+    }
     
     // private fun showWalletInfo(walletInfo: SubstrateCryptoManager.WalletInfo) {
     //     // Mostrar información de la wallet creada
@@ -190,7 +246,7 @@ class MainActivity : AppCompatActivity() {
     // }
 
     private inner class ViewPagerAdapter(activity: AppCompatActivity) : FragmentStateAdapter(activity) {
-        override fun getItemCount(): Int = 4
+        override fun getItemCount(): Int = 7
 
         override fun createFragment(position: Int): Fragment {
             return when (position) {
@@ -198,6 +254,9 @@ class MainActivity : AppCompatActivity() {
                 1 -> WalletInfoFragment.newInstance()
                 2 -> ImportExportFragment.newInstance()
                 3 -> SS58ToolsFragment.newInstance()
+                4 -> NetworkStatusFragment.newInstance()
+                5 -> SigningFragment.newInstance()
+                6 -> TestCryptoFragment()
                 else -> throw IllegalArgumentException("Invalid position: $position")
             }
         }

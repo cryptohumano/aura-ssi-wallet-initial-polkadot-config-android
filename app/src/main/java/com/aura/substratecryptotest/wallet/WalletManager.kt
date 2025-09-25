@@ -9,8 +9,11 @@ import androidx.lifecycle.viewModelScope
 import com.aura.substratecryptotest.crypto.keypair.EncryptionAlgorithm
 import com.aura.substratecryptotest.crypto.mnemonic.MnemonicManager
 import com.aura.substratecryptotest.crypto.keypair.KeyPairManager
+import io.novasama.substrate_sdk_android.encrypt.EncryptionType
 import com.aura.substratecryptotest.crypto.verification.KeyVerificationManager
 import com.aura.substratecryptotest.crypto.ss58.SS58Encoder
+import com.aura.substratecryptotest.crypto.kilt.KiltProtocolManager
+import com.aura.substratecryptotest.crypto.kilt.KiltDidManager
 import com.aura.substratecryptotest.utils.Logger
 import io.novasama.substrate_sdk_android.encrypt.mnemonic.Mnemonic
 import kotlinx.coroutines.launch
@@ -18,12 +21,13 @@ import kotlinx.coroutines.launch
 /**
  * Gestor de wallets simplificado
  */
-class WalletManager(context: Context) : ViewModel() {
+class WalletManager(private val context: Context) : ViewModel() {
     
     private val mnemonicManager = MnemonicManager()
     private val keyPairManager = KeyPairManager()
     private val keyVerificationManager = KeyVerificationManager()
     private val ss58Encoder = SS58Encoder()
+    private val kiltProtocolManager = KiltProtocolManager()
     
     private val _wallets = MutableLiveData<List<Wallet>>()
     private val _currentWallet = MutableLiveData<Wallet?>()
@@ -93,9 +97,18 @@ class WalletManager(context: Context) : ViewModel() {
                     return@launch
                 }
                 
-                // Generar direcciones para múltiples parachains
+                // Generar direcciones para múltiples parachains (sin path)
                 val addresses = generateMultipleAddresses(keyPairInfo.publicKey)
                 val mainAddress = addresses[SS58Encoder.NetworkPrefix.SUBSTRATE] ?: generateAddress(keyPairInfo.publicKey)
+                
+                // Generar direcciones DID derivadas para KILT y Polkadot (con path //did//0)
+                val didDerivedAddresses = generateDidDerivedAddresses(mnemonic, password)
+                
+                // Combinar direcciones: normales + DID derivadas
+                val allAddresses = addresses.toMutableMap()
+                allAddresses.putAll(didDerivedAddresses)
+                
+                Logger.i("WalletManager", "🆔 Wallet Substrate creada con derivaciones duales - KILT y Polkadot tienen ambas derivaciones")
                 
                 val wallet = Wallet(
                     id = generateWalletId(),
@@ -108,10 +121,29 @@ class WalletManager(context: Context) : ViewModel() {
                     derivationPath = "", // TODO: Implementar JunctionCoder para paths reales
                     createdAt = System.currentTimeMillis(),
                     metadata = mapOf(
-                        "addresses" to addresses,
-                        "parachain_count" to addresses.size
-                    )
+                        "addresses" to allAddresses,
+                        "parachain_count" to allAddresses.size,
+                        "dual_derivations" to mapOf(
+                            "kilt" to mapOf(
+                                "base" to addresses[SS58Encoder.NetworkPrefix.KILT],
+                                "did" to didDerivedAddresses[SS58Encoder.NetworkPrefix.KILT]
+                            ),
+                            "polkadot" to mapOf(
+                                "base" to addresses[SS58Encoder.NetworkPrefix.POLKADOT],
+                                "did" to didDerivedAddresses[SS58Encoder.NetworkPrefix.POLKADOT]
+                            )
+                        )
+                    ),
+                    kiltDid = null, // Se derivará manualmente
+                    kiltAddress = null, // Se derivará manualmente
+                    kiltDids = null // Se derivará manualmente
                 )
+                
+                // Información sobre derivación manual de DID KILT
+                Logger.success("WalletManager", "✅ Wallet Substrate creada exitosamente", 
+                    "Cuenta Substrate lista para usar")
+                Logger.debug("WalletManager", "Para derivar DID KILT", 
+                    "Ve a 'Info Wallet' y presiona 'Derivar DID' para generar el DID con path //did//0")
                 
                 val currentWallets = _wallets.value?.toMutableList() ?: mutableListOf()
                 currentWallets.add(wallet)
@@ -129,7 +161,7 @@ class WalletManager(context: Context) : ViewModel() {
     /**
      * Importa una wallet desde JSON
      */
-    fun importWalletFromJson(name: String, jsonString: String, password: String?) {
+    fun importWalletFromJson(name: String, @Suppress("UNUSED_PARAMETER") jsonString: String, @Suppress("UNUSED_PARAMETER") password: String?) {
         viewModelScope.launch {
             try {
                 _isLoading.value = true
@@ -232,6 +264,86 @@ class WalletManager(context: Context) : ViewModel() {
     }
     
     /**
+     * Obtiene el DID KILT principal de la wallet actual
+     */
+    fun getCurrentWalletKiltDid(): String? {
+        return _currentWallet.value?.kiltDid
+    }
+    
+    /**
+     * Obtiene la dirección KILT de la wallet actual
+     */
+    fun getCurrentWalletKiltAddress(): String? {
+        return _currentWallet.value?.kiltAddress
+    }
+    
+    /**
+     * Obtiene todos los DIDs KILT de la wallet actual
+     */
+    fun getCurrentWalletKiltDids(): Map<String, String>? {
+        return _currentWallet.value?.kiltDids
+    }
+    
+    /**
+     * Obtiene información completa de DIDs KILT de la wallet actual
+     */
+    fun getCurrentWalletKiltInfo(): KiltWalletInfo? {
+        val wallet = _currentWallet.value ?: return null
+        return KiltWalletInfo(
+            primaryDid = wallet.kiltDid,
+            kiltAddress = wallet.kiltAddress,
+            allDids = wallet.kiltDids,
+            hasKiltSupport = wallet.kiltDid != null
+        )
+    }
+    
+    /**
+     * Deriva un DID KILT desde la wallet actual usando su clave pública
+     * @return KiltDidInfo derivado o null si hay error
+     */
+    suspend fun deriveKiltDidFromCurrentWallet(): KiltDidManager.KiltDidInfo? {
+        val wallet = _currentWallet.value ?: return null
+        
+        return try {
+            Logger.i("WalletManager", "🆔 Derivando DID KILT al path //did//0 desde wallet actual...")
+            Logger.debug("WalletManager", "Mnemonic de wallet: ${wallet.mnemonic.length} palabras", "Palabras: ${wallet.mnemonic.length}")
+            
+            val kiltDidInfo = kiltProtocolManager.deriveKiltDidFromWallet(
+                mnemonic = wallet.mnemonic,
+                password = null // TODO: Obtener password si es necesario
+            )
+            
+            // Actualizar la wallet con el DID derivado
+            val updatedWallet = wallet.copy(
+                kiltDid = kiltDidInfo.did,
+                kiltAddress = kiltDidInfo.address,
+                kiltDids = mapOf("authentication" to kiltDidInfo.did)
+            )
+            
+            // Actualizar la lista de wallets
+            val currentWallets = _wallets.value?.toMutableList() ?: mutableListOf()
+            val index = currentWallets.indexOfFirst { it.id == wallet.id }
+            if (index >= 0) {
+                currentWallets[index] = updatedWallet
+                _wallets.value = currentWallets
+                _currentWallet.value = updatedWallet
+            }
+            
+                Logger.success("WalletManager", "✅ DID KILT derivado exitosamente desde clave pública",
+                    "DID: ${kiltDidInfo.did}")
+                Logger.debug("WalletManager", "🔍 Comparación de direcciones", 
+                    "Substrate Base: ${wallet.address}\nKILT Derivada: ${kiltDidInfo.address}")
+                Logger.debug("WalletManager", "🔍 Path de derivación aplicado", 
+                    "Path: ${kiltDidInfo.derivationPath}")
+            
+            kiltDidInfo
+        } catch (e: Exception) {
+            Logger.error("WalletManager", "Error derivando DID KILT", e.message ?: "Error desconocido")
+            null
+        }
+    }
+    
+    /**
      * Obtiene todas las direcciones de parachains de la wallet actual
      */
     fun getCurrentWalletParachainAddresses(): Map<SS58Encoder.NetworkPrefix, String>? {
@@ -248,10 +360,19 @@ class WalletManager(context: Context) : ViewModel() {
     }
     
     /**
-     * Obtiene la dirección KILT de la wallet actual
+     * Obtiene la dirección KILT de parachain de la wallet actual
      */
-    fun getCurrentWalletKiltAddress(): String? {
+    fun getCurrentWalletKiltParachainAddress(): String? {
         return getCurrentWalletParachainAddress(SS58Encoder.NetworkPrefix.KILT)
+    }
+    
+    /**
+     * Obtiene las derivaciones duales (base y DID) para KILT y Polkadot
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun getCurrentWalletDualDerivations(): Map<String, Map<String, String?>>? {
+        val wallet = _currentWallet.value
+        return wallet?.metadata?.get("dual_derivations") as? Map<String, Map<String, String?>>
     }
     
     /**
@@ -277,11 +398,14 @@ class WalletManager(context: Context) : ViewModel() {
             id = wallet.id,
             name = wallet.name,
             mnemonic = wallet.mnemonic,
-            publicKey = wallet.publicKey?.joinToString("") { "%02x".format(it) } ?: "N/A",
-            address = wallet.address,
+            publicKey = wallet.publicKey.joinToString("") { "%02x".format(it) },
+            address = wallet.address, // Dirección Substrate base
             cryptoType = wallet.cryptoType,
             derivationPath = wallet.derivationPath,
-            createdAt = wallet.createdAt
+            createdAt = wallet.createdAt,
+            kiltDid = wallet.kiltDid,
+            kiltAddress = wallet.kiltAddress, // Dirección KILT derivada con //did//0
+            kiltDids = wallet.kiltDids
         )
     }
     
@@ -313,11 +437,55 @@ class WalletManager(context: Context) : ViewModel() {
             Logger.success("WalletManager", "Direcciones generadas para ${addresses.size} parachains", 
                 "Parachains: ${addresses.keys.joinToString { it.networkName }}")
             
+            // Log específico para dirección KILT
+            val kiltAddress = addresses[SS58Encoder.NetworkPrefix.KILT]
+            if (kiltAddress != null) {
+                Logger.debug("WalletManager", "🔍 Dirección KILT generada en wallet creation", 
+                    "KILT Address: $kiltAddress")
+            }
+            
             addresses
         } catch (e: Exception) {
             Logger.error("WalletManager", "Error generando direcciones múltiples", e.message ?: "Error desconocido", e)
             // Fallback: solo dirección Substrate
             mapOf(SS58Encoder.NetworkPrefix.SUBSTRATE to generateAddress(publicKey))
+        }
+    }
+    
+    /**
+     * Genera direcciones con derivación //did//0 para KILT y Polkadot
+     */
+    private suspend fun generateDidDerivedAddresses(mnemonic: String, password: String?): Map<SS58Encoder.NetworkPrefix, String> {
+        return try {
+            val didDerivedAddresses = mutableMapOf<SS58Encoder.NetworkPrefix, String>()
+            
+            // Generar clave pública derivada con path //did//0
+            val keyPairManager = KeyPairManager()
+            val keyPairInfo = keyPairManager.generateKeyPairWithPath(
+                algorithm = EncryptionAlgorithm.SR25519,
+                mnemonic = mnemonic,
+                derivationPath = "//did//0",
+                password = password
+            )
+            
+            if (keyPairInfo != null) {
+                // Generar direcciones KILT y Polkadot con la clave derivada
+                val kiltDidAddress = ss58Encoder.encode(keyPairInfo.publicKey, SS58Encoder.NetworkPrefix.KILT)
+                val polkadotDidAddress = ss58Encoder.encode(keyPairInfo.publicKey, SS58Encoder.NetworkPrefix.POLKADOT)
+                
+                didDerivedAddresses[SS58Encoder.NetworkPrefix.KILT] = kiltDidAddress
+                didDerivedAddresses[SS58Encoder.NetworkPrefix.POLKADOT] = polkadotDidAddress
+                
+                Logger.success("WalletManager", "Direcciones DID derivadas generadas", 
+                    "KILT DID: ${kiltDidAddress.take(20)}..., Polkadot DID: ${polkadotDidAddress.take(20)}...")
+            } else {
+                Logger.error("WalletManager", "Error generando keypair para derivación DID", "KeyPairInfo es null")
+            }
+            
+            didDerivedAddresses
+        } catch (e: Exception) {
+            Logger.error("WalletManager", "Error generando direcciones DID derivadas", e.message ?: "Error desconocido", e)
+            emptyMap()
         }
     }
     
@@ -350,7 +518,10 @@ data class Wallet(
     val cryptoType: EncryptionAlgorithm,
     val derivationPath: String,
     val createdAt: Long,
-    val metadata: Map<String, Any>
+    val metadata: Map<String, Any>,
+    val kiltDid: String? = null,                    // DID KILT principal
+    val kiltAddress: String? = null,                // Dirección KILT (prefix 38)
+    val kiltDids: Map<String, String>? = null      // Múltiples DIDs KILT
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -370,6 +541,9 @@ data class Wallet(
         if (derivationPath != other.derivationPath) return false
         if (createdAt != other.createdAt) return false
         if (metadata != other.metadata) return false
+        if (kiltDid != other.kiltDid) return false
+        if (kiltAddress != other.kiltAddress) return false
+        if (kiltDids != other.kiltDids) return false
 
         return true
     }
@@ -385,6 +559,9 @@ data class Wallet(
         result = 31 * result + derivationPath.hashCode()
         result = 31 * result + createdAt.hashCode()
         result = 31 * result + metadata.hashCode()
+        result = 31 * result + (kiltDid?.hashCode() ?: 0)
+        result = 31 * result + (kiltAddress?.hashCode() ?: 0)
+        result = 31 * result + (kiltDids?.hashCode() ?: 0)
         return result
     }
 }
@@ -400,7 +577,10 @@ data class WalletInfo(
     val address: String,
     val cryptoType: EncryptionAlgorithm,
     val derivationPath: String,
-    val createdAt: Long
+    val createdAt: Long,
+    val kiltDid: String? = null,
+    val kiltAddress: String? = null,
+    val kiltDids: Map<String, String>? = null
 ) {
     /**
      * Obtiene el mnemonic formateado para mostrar (con números)
@@ -428,6 +608,20 @@ data class WalletInfo(
     }
     
     fun getFormattedDerivationPath(): String {
-        return if (derivationPath.isBlank()) "Sin path (por implementar)" else derivationPath
+        return when {
+            derivationPath.isBlank() -> "Sin path (cuenta base)"
+            kiltAddress != null -> "Base: sin path | KILT: //did//0"
+            else -> derivationPath
+        }
     }
 }
+
+/**
+ * Información específica de DIDs KILT de una wallet
+ */
+data class KiltWalletInfo(
+    val primaryDid: String?,
+    val kiltAddress: String?,
+    val allDids: Map<String, String>?,
+    val hasKiltSupport: Boolean
+)

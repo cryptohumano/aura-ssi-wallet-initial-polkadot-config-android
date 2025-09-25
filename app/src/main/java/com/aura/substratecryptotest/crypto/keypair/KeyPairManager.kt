@@ -343,13 +343,19 @@ class KeyPairManager {
     ): Keypair? {
         return withContext(Dispatchers.IO) {
             try {
-                val mnemonicObj = MnemonicCreator.fromWords(mnemonic)
-                val entropy = mnemonicObj.entropy
-                // Usar entropy como seed temporalmente hasta que se implemente generateSeed
-                val seed = entropy
+                val seed = com.aura.substratecryptotest.crypto.mnemonic.MnemonicManager().generateSeed(mnemonic, password)
                 
-                SubstrateKeypairFactory.generate(encryptionType, seed)
+                if (derivationPath != null) {
+                    // Decodificar el path a junctions
+                    val decoder = io.novasama.substrate_sdk_android.encrypt.junction.SubstrateJunctionDecoder
+                    val decodeResult = decoder.decode(derivationPath)
+                    SubstrateKeypairFactory.generate(encryptionType, seed, decodeResult.junctions)
+                } else {
+                    SubstrateKeypairFactory.generate(encryptionType, seed)
+                }
             } catch (e: Exception) {
+                println("🔍 KeyPairManager: Error en generateKeyPairWithPath: ${e.message}")
+                println("🔍 KeyPairManager: Stack trace: ${e.stackTrace.joinToString("\n")}")
                 null
             }
         }

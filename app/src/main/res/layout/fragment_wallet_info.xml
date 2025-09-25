@@ -446,6 +446,90 @@
 
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- KILT DID Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="12dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🆔 DID KILT"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:spacing="8dp">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnDeriveKiltDid"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Derivar DID"
+                                android:textSize="12sp"
+                                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnTestKiltSignature"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Probar Firma"
+                                android:textSize="12sp"
+                                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                    <!-- DID Info -->
+                    <TextView
+                        android:id="@+id/textKiltDidInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="DID no derivado aún"
+                        android:textSize="14sp"
+                        android:fontFamily="monospace"
+                        android:background="@android:color/black"
+                        android:textColor="@android:color/white"
+                        android:padding="12dp"
+                        android:layout_marginBottom="8dp" />
+
+                    <!-- DID Address -->
+                    <TextView
+                        android:id="@+id/textKiltDidAddress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Dirección KILT: No disponible"
+                        android:textSize="12sp"
+                        android:fontFamily="monospace"
+                        android:background="@android:color/white"
+                        android:textColor="@android:color/black"
+                        android:padding="8dp" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- Refresh Button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRefresh"

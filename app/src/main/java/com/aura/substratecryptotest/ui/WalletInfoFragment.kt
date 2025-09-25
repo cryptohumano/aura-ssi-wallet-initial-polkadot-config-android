@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.Observer
+import androidx.lifecycle.lifecycleScope
 import com.aura.substratecryptotest.MainActivity
 import com.aura.substratecryptotest.databinding.FragmentWalletInfoBinding
 import com.aura.substratecryptotest.wallet.WalletManager
@@ -87,6 +88,16 @@ class WalletInfoFragment : Fragment() {
         binding.btnGenerateAllAddresses.setOnClickListener {
             generateAllParachainAddresses()
         }
+        
+        // Botón para derivar DID KILT
+        binding.btnDeriveKiltDid.setOnClickListener {
+            deriveKiltDid()
+        }
+        
+        // Botón para probar firma KILT
+        binding.btnTestKiltSignature.setOnClickListener {
+            testKiltSignature()
+        }
     }
     
     /**
@@ -115,6 +126,8 @@ class WalletInfoFragment : Fragment() {
     }
     
     private fun displayWalletInfo(walletInfo: WalletInfo) {
+        Logger.debug("WalletInfoFragment", "Actualizando UI", "DID: ${walletInfo.kiltDid ?: "null"}, Address: ${walletInfo.kiltAddress ?: "null"}")
+        
         // Información básica
         binding.textWalletName.text = walletInfo.name
         binding.textWalletId.text = "ID: ${walletInfo.id}"
@@ -129,10 +142,13 @@ class WalletInfoFragment : Fragment() {
         // Clave pública
         binding.textPublicKey.text = walletInfo.publicKey
         
-        // Dirección principal
-        binding.textAddress.text = walletInfo.address
+        // Dirección principal (Substrate base)
+        binding.textAddress.text = "Substrate: ${walletInfo.address}"
         
-        // Mostrar direcciones de parachains si están disponibles
+        // Mostrar información del DID KILT si está disponible (PRIMERO)
+        displayKiltDidInfo(walletInfo)
+        
+        // Mostrar direcciones de parachains si están disponibles (DESPUÉS)
         displayParachainAddresses()
         
         // Mostrar el contenedor de información
@@ -141,22 +157,55 @@ class WalletInfoFragment : Fragment() {
     }
     
     /**
-     * Muestra las direcciones de parachains disponibles
+     * Muestra las direcciones de parachains disponibles con derivaciones duales
      */
     private fun displayParachainAddresses() {
+        val walletInfo = walletManager.getCurrentWalletInfo()
+        
+        // Si el DID KILT ya está derivado, NO sobrescribir la comparación de direcciones
+        if (walletInfo?.kiltDid != null && walletInfo.kiltAddress != null) {
+            Logger.debug("WalletInfoFragment", "DID KILT ya derivado", "Manteniendo comparación de direcciones")
+            return // No sobrescribir la información de comparación
+        }
+        
         val parachainAddresses = walletManager.getCurrentWalletParachainAddresses()
+        val dualDerivations = walletManager.getCurrentWalletDualDerivations()
         
         if (parachainAddresses != null && parachainAddresses.isNotEmpty()) {
-            // Mostrar información de parachains disponibles
-            val parachainInfo = parachainAddresses.entries.joinToString("\n") { (network, address) ->
-                "🌐 ${network.networkName}: ${address.take(20)}..."
+            val parachainInfo = StringBuilder()
+            parachainInfo.append("📍 Direcciones de Parachains:\n\n")
+            
+            // Mostrar derivaciones duales para KILT y Polkadot
+            dualDerivations?.let { derivations ->
+                derivations["kilt"]?.let { kilt ->
+                    parachainInfo.append("🔹 KILT:\n")
+                    parachainInfo.append("  • Base (sin path): ${kilt["base"]?.take(20)}...\n")
+                    parachainInfo.append("  • DID (//did//0): ${kilt["did"]?.take(20)}...\n\n")
+                }
+                
+                derivations["polkadot"]?.let { polkadot ->
+                    parachainInfo.append("🔹 Polkadot:\n")
+                    parachainInfo.append("  • Base (sin path): ${polkadot["base"]?.take(20)}...\n")
+                    parachainInfo.append("  • DID (//did//0): ${polkadot["did"]?.take(20)}...\n\n")
+                }
             }
             
-            // Actualizar el texto de información de parachains si existe
-            binding.textParachainInfo.text = "Direcciones generadas para ${parachainAddresses.size} parachains:\n$parachainInfo"
+            // Mostrar otras redes (solo derivación base)
+            val otherNetworks = parachainAddresses.filterKeys { 
+                it != SS58Encoder.NetworkPrefix.KILT && it != SS58Encoder.NetworkPrefix.POLKADOT 
+            }
             
-            Logger.success("WalletInfoFragment", "Direcciones de parachains cargadas", 
-                "Total: ${parachainAddresses.size}, Redes: ${parachainAddresses.keys.joinToString { it.networkName }}")
+            if (otherNetworks.isNotEmpty()) {
+                parachainInfo.append("🔹 Otras redes (solo base):\n")
+                otherNetworks.entries.forEach { (network, address) ->
+                    parachainInfo.append("  • ${network.networkName}: ${address.take(20)}...\n")
+                }
+            }
+            
+            binding.textParachainInfo.text = parachainInfo.toString()
+            
+            Logger.success("WalletInfoFragment", "Derivaciones duales mostradas", 
+                "KILT y Polkadot con ambas derivaciones, ${otherNetworks.size} redes adicionales")
         } else {
             binding.textParachainInfo.text = "No hay direcciones de parachains disponibles"
         }
@@ -316,6 +365,178 @@ class WalletInfoFragment : Fragment() {
                 copyToClipboard("Todas las Direcciones", allAddresses)
             }
             .setNegativeButton("Cerrar", null)
+            .show()
+    }
+    
+    /**
+     * Deriva un DID KILT desde la cuenta Substrate actual
+     */
+    private fun deriveKiltDid() {
+        val currentWallet = walletManager.currentWallet.value
+        if (currentWallet == null) {
+            showErrorDialog("No hay wallet disponible", "Primero crea una wallet para derivar el DID KILT")
+            return
+        }
+        
+        // Mostrar loading
+        binding.btnDeriveKiltDid.isEnabled = false
+        binding.btnDeriveKiltDid.text = "Derivando..."
+        
+        // Ejecutar derivación en background
+        lifecycleScope.launch {
+            try {
+                val kiltDidInfo = walletManager.deriveKiltDidFromCurrentWallet()
+                
+                if (kiltDidInfo != null) {
+                    // ✅ ACTUALIZAR TODA LA UI con la información actualizada
+                    Logger.success("WalletInfoFragment", "DID derivado exitosamente", "Actualizando UI completa")
+                    val updatedWalletInfo = walletManager.getCurrentWalletInfo()
+                    if (updatedWalletInfo != null) {
+                        Logger.debug("WalletInfoFragment", "Refrescando UI", "DID: ${updatedWalletInfo.kiltDid}, Address: ${updatedWalletInfo.kiltAddress}")
+                        displayWalletInfo(updatedWalletInfo)
+                    }
+                    
+                    // Mostrar diálogo de éxito
+                    showSuccessDialog(
+                        "DID KILT Derivado Exitosamente",
+                        "DID: ${kiltDidInfo.did}\n\nDirección: ${kiltDidInfo.address}\n\nPath: ${kiltDidInfo.derivationPath}"
+                    )
+                } else {
+                    showErrorDialog("Error", "No se pudo derivar el DID KILT")
+                }
+            } catch (e: Exception) {
+                showErrorDialog("Error derivando DID KILT", e.message ?: "Error desconocido")
+            } finally {
+                // Restaurar botón
+                binding.btnDeriveKiltDid.isEnabled = true
+                binding.btnDeriveKiltDid.text = "Derivar DID"
+            }
+        }
+    }
+    
+    /**
+     * Muestra la información del DID KILT si está disponible
+     */
+    private fun displayKiltDidInfo(walletInfo: WalletInfo) {
+        if (walletInfo.kiltDid != null && walletInfo.kiltAddress != null) {
+            binding.textKiltDidInfo.text = walletInfo.kiltDid
+            binding.textKiltDidAddress.text = "KILT (//did//0): ${walletInfo.kiltAddress}"
+            binding.btnDeriveKiltDid.text = "DID Ya Derivado"
+            binding.btnDeriveKiltDid.isEnabled = false
+            
+            // Mostrar comparación de direcciones
+            showAddressComparison(walletInfo.address, walletInfo.kiltAddress)
+        } else {
+            binding.textKiltDidInfo.text = "DID no derivado aún"
+            binding.textKiltDidAddress.text = "KILT (//did//0): No disponible"
+            binding.btnDeriveKiltDid.text = "Derivar DID"
+            binding.btnDeriveKiltDid.isEnabled = true
+        }
+    }
+    
+    /**
+     * Muestra comparación entre dirección Substrate base y KILT derivada
+     */
+    private fun showAddressComparison(substrateAddress: String, kiltAddress: String) {
+        val comparison = """
+            📍 Comparación de Direcciones:
+            
+            🔹 Substrate Base (sin path):
+            $substrateAddress
+            
+            🔹 KILT Derivada (//did//0):
+            $kiltAddress
+            
+            ✅ Derivación exitosa - Direcciones diferentes
+            📊 Path aplicado: //did//0
+        """.trimIndent()
+        
+        // Actualizar el texto de información de parachains para mostrar la comparación
+        binding.textParachainInfo.text = comparison
+        
+        Logger.success("WalletInfoFragment", "Comparación de direcciones mostrada", 
+            "Substrate: ${substrateAddress.take(20)}... | KILT: ${kiltAddress.take(20)}...")
+    }
+    
+    /**
+     * Muestra un diálogo de éxito
+     */
+    private fun showSuccessDialog(title: String, message: String) {
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle("✅ $title")
+            .setMessage(message)
+            .setPositiveButton("Copiar DID") { _, _ ->
+                copyToClipboard("DID KILT", binding.textKiltDidInfo.text.toString())
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+    
+    /**
+     * Prueba la firma KILT con el DID actual
+     */
+    private fun testKiltSignature() {
+        val currentWallet = walletManager.currentWallet.value
+        if (currentWallet == null) {
+            showErrorDialog("No hay wallet disponible", "Primero crea una wallet para probar las firmas KILT")
+            return
+        }
+        
+        if (currentWallet.kiltDid == null) {
+            showErrorDialog("DID no disponible", "Primero deriva el DID KILT para probar las firmas")
+            return
+        }
+        
+        // Mostrar loading
+        binding.btnTestKiltSignature.isEnabled = false
+        binding.btnTestKiltSignature.text = "Probando..."
+        
+        // Ejecutar prueba de firma en background
+        lifecycleScope.launch {
+            try {
+                val kiltDidInfo = walletManager.getCurrentWalletKiltInfo()
+                if (kiltDidInfo != null) {
+                    // Crear KiltSignatureManager y probar firma
+                    val signatureManager = com.aura.substratecryptotest.crypto.kilt.KiltSignatureManager()
+                    
+                    // Crear KiltDidInfo desde la información disponible
+                    val didInfo = com.aura.substratecryptotest.crypto.kilt.KiltDidManager.KiltDidInfo(
+                        did = kiltDidInfo.primaryDid ?: "",
+                        address = kiltDidInfo.kiltAddress ?: "",
+                        publicKey = ByteArray(32), // TODO: Obtener clave pública real
+                        verificationRelationship = com.aura.substratecryptotest.crypto.kilt.KiltDidManager.VerificationRelationship.AUTHENTICATION,
+                        didType = com.aura.substratecryptotest.crypto.kilt.KiltDidManager.DidType.FULL,
+                        derivationPath = "//did//0"
+                    )
+                    
+                    val signature = signatureManager.testDidSignature(didInfo, "Mensaje de prueba KILT")
+                    
+                    // Mostrar resultado
+                    showSuccessDialog(
+                        "Firma KILT Exitosa",
+                        "Key URI: ${signature.keyUri}\n\nFirma: ${signature.signature}\n\nRelación: ${signature.verificationRelationship.name}\n\nNonce: ${signature.nonce}\n\nSubmitter: ${signature.submitter}"
+                    )
+                } else {
+                    showErrorDialog("Error", "No se pudo obtener información del DID KILT")
+                }
+            } catch (e: Exception) {
+                showErrorDialog("Error probando firma KILT", e.message ?: "Error desconocido")
+            } finally {
+                // Restaurar botón
+                binding.btnTestKiltSignature.isEnabled = true
+                binding.btnTestKiltSignature.text = "Probar Firma"
+            }
+        }
+    }
+    
+    /**
+     * Muestra un diálogo de error
+     */
+    private fun showErrorDialog(title: String, message: String) {
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle("❌ $title")
+            .setMessage(message)
+            .setPositiveButton("Cerrar", null)
             .show()
     }
     
