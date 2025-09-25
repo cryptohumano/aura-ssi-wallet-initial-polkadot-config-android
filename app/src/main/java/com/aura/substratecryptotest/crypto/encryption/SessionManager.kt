@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
  * Gestor de sesiones de autenticación DID
  * Orquesta el flujo completo de autenticación con servidor
  */
-class SessionManager(private val context: Context) {
+class SessionManager(private val context: Context, private val walletManager: com.aura.substratecryptotest.wallet.WalletManager) {
     
     companion object {
         private const val TAG = "SessionManager"
@@ -20,7 +20,6 @@ class SessionManager(private val context: Context) {
     private val encryptionKeyManager = EncryptionKeyManager(context)
     private val biometricManager = BiometricManager(context)
     private val kiltDidManager = KiltDidManager()
-    private val walletManager = WalletManager(context)
     
     /**
      * Datos de sesión de autenticación

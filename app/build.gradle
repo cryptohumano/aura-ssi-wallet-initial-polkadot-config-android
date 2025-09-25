@@ -40,6 +40,11 @@ android {
     buildFeatures {
         viewBinding true
         buildConfig true
+        compose true
+    }
+    
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.3"
     }
     
     packagingOptions {
@@ -73,6 +78,24 @@ dependencies {
     implementation 'androidx.viewpager2:viewpager2:1.0.0'
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
     implementation 'androidx.biometric:biometric:1.1.0'
+    
+    // ===== JETPACK COMPOSE =====
+    implementation 'androidx.activity:activity-compose:1.8.0'
+    implementation 'androidx.compose.ui:ui:1.5.3'
+    implementation 'androidx.compose.ui:ui-tooling-preview:1.5.3'
+    implementation 'androidx.compose.material3:material3:1.1.1'
+    implementation 'androidx.compose.material:material-icons-extended:1.5.3'
+    implementation 'androidx.navigation:navigation-compose:2.7.5'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0'
+    implementation 'androidx.compose.runtime:runtime-livedata:1.5.3'
+    
+    // Compose Debug
+    debugImplementation 'androidx.compose.ui:ui-tooling:1.5.3'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest:1.5.3'
+
+    // ===== HTTP CLIENT =====
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
 
     // ===== SUBSTRATE SDK =====
     implementation 'io.github.nova-wallet:substrate-sdk-android:2.4.0'
