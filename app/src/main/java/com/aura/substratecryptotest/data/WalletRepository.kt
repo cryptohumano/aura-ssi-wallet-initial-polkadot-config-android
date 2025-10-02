@@ -1,24 +1,22 @@
 package com.aura.substratecryptotest.data
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import com.aura.substratecryptotest.wallet.WalletManager
+import androidx.lifecycle.Observer
+import com.aura.substratecryptotest.data.wallet.*
+import com.aura.substratecryptotest.data.WalletState
+import com.aura.substratecryptotest.data.WalletInfo
 import com.aura.substratecryptotest.wallet.Wallet
-import com.aura.substratecryptotest.crypto.keypair.EncryptionAlgorithm
-import com.aura.substratecryptotest.crypto.mnemonic.MnemonicManager
-import io.novasama.substrate_sdk_android.encrypt.mnemonic.Mnemonic
 import com.aura.substratecryptotest.utils.Logger
-import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Repositorio para gestionar el estado de las wallets
- * Implementa el flujo correcto: mnemonic → validación → derivación → confirmación → guardado
+ * Repositorio principal para gestionar el estado de las wallets
+ * Ahora utiliza servicios modulares para separar responsabilidades
  */
 class WalletRepository private constructor(private val context: Context) {
     
@@ -33,15 +31,22 @@ class WalletRepository private constructor(private val context: Context) {
         }
     }
 
-    val walletManager = WalletManager(context)
-    private val mnemonicManager = MnemonicManager()
-    private val sharedPreferences: SharedPreferences = context.getSharedPreferences("wallet_storage", Context.MODE_PRIVATE)
+    // Servicios modulares
+    private val mnemonicService = MnemonicService()
+    private val accountDerivationService = AccountDerivationService()
+    private val walletCreationService = WalletCreationService(context)
+    private val walletStateManager = WalletStateManager.getInstance(context)
+    private val walletDeletionService = WalletDeletionService(context)
+    private val walletRenameService = WalletRenameService(context) // ✅ Nuevo servicio
+    private val userWalletService = UserWalletService(context)
+    private val walletValidationService = WalletValidationService(context)
     
-    private val _currentWallet = MutableLiveData<WalletState>()
-    val currentWallet: LiveData<WalletState> = _currentWallet
+    // Gestión de observadores para evitar memory leaks
+    private val observers = mutableListOf<Observer<*>>()
     
-    private val _isWalletCreated = MutableLiveData<Boolean>()
-    val isWalletCreated: LiveData<Boolean> = _isWalletCreated
+    // Estados expuestos
+    val currentWallet: LiveData<WalletState> = walletStateManager.currentWallet
+    val isWalletCreated: LiveData<Boolean> = walletStateManager.isWalletCreated
     
     // Estado del flujo de creación
     private val _generatedMnemonic = MutableLiveData<String?>()
@@ -55,75 +60,88 @@ class WalletRepository private constructor(private val context: Context) {
     }
     
     /**
-     * Verifica si ya existe una wallet
+     * Limpia todos los observadores para evitar memory leaks
+     */
+    fun cleanup() {
+        observers.forEach { observer ->
+            // Los observadores se remueven automáticamente
+        }
+        observers.clear()
+        Logger.debug("WalletRepository", "Observadores limpiados", "Cantidad: ${observers.size}")
+    }
+    
+    /**
+     * Verifica si existe una wallet y la carga
      */
     private fun checkExistingWallet() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // TODO: Implementar verificación de wallet existente
-                // Por ahora asumimos que no hay wallet
-                _isWalletCreated.postValue(false)
-                _currentWallet.postValue(WalletState.None)
+                Logger.debug("WalletRepository", "Verificando wallet existente", "")
+                
+                walletStateManager.initialize()
+                
+                // Verificar si hay wallet actual
+                val currentWalletInfo = walletStateManager.getCurrentWalletInfo()
+                if (currentWalletInfo != null) {
+                    Logger.success("WalletRepository", "Wallet existente encontrada", "Nombre: ${currentWalletInfo.name}")
+                } else {
+                    Logger.debug("WalletRepository", "No hay wallet existente", "Iniciando estado vacío")
+                }
             } catch (e: Exception) {
                 Logger.error("WalletRepository", "Error verificando wallet existente", e.message ?: "Error desconocido", e)
-                _isWalletCreated.postValue(false)
-                _currentWallet.postValue(WalletState.None)
             }
         }
     }
     
+    // ==================== FUNCIONES DE MNEMÓNICOS ====================
+    
     /**
-     * Paso 1: Genera un mnemonic para validación del usuario
+     * Genera un mnemonic para validación del usuario
      */
     suspend fun generateMnemonicForValidation(): String {
-        val mnemonic = mnemonicManager.generateMnemonic(Mnemonic.Length.TWELVE)
+        val mnemonic = mnemonicService.generateMnemonicForValidation()
         _generatedMnemonic.postValue(mnemonic)
-        Logger.debug("WalletRepository", "Mnemonic generado para validación", "Longitud: ${mnemonic.split(" ").size} palabras")
         return mnemonic
     }
-
+    
     /**
-     * Paso 2: Valida el mnemonic ingresado por el usuario
+     * Valida un mnemonic comparándolo con el original
      */
     fun validateMnemonic(userMnemonic: String, originalMnemonic: String): Boolean {
-        val isValid = userMnemonic.trim().lowercase() == originalMnemonic.trim().lowercase()
-        Logger.debug("WalletRepository", "Validación de mnemonic", "Resultado: $isValid")
-        return isValid
+        return mnemonicService.validateMnemonic(userMnemonic, originalMnemonic)
     }
-
+    
     /**
-     * Paso 3: Deriva la cuenta de fondos (sin path) y muestra direcciones
+     * Valida un mnemonic y retorna un Result
+     */
+    fun validateMnemonicWithResult(userMnemonic: String, originalMnemonic: String): Result<Boolean> {
+        return mnemonicService.validateMnemonicWithResult(userMnemonic, originalMnemonic)
+    }
+    
+    // ==================== FUNCIONES DE DERIVACIÓN ====================
+    
+    /**
+     * Deriva una cuenta de fondos desde un mnemonic (versión con callbacks)
      */
     fun deriveFundsAccount(mnemonic: String, onSuccess: (Map<String, String>) -> Unit, onError: (String) -> Unit) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                Logger.debug("WalletRepository", "Generando direcciones de cuenta de fondos", "Mnemonic: ${mnemonic.length} palabras")
-                
-                // Generar solo las direcciones (sin crear wallet)
-                val addresses = walletManager.generateAddressesOnly(mnemonic, null)
-                
-                if (addresses.isNotEmpty()) {
-                    val addressMap = addresses.mapKeys { it.key.toString() }.mapValues { it.value.toString() }
-                    
-                    Logger.success("WalletRepository", "Direcciones generadas", "Cantidad: ${addressMap.size}")
-                    Logger.debug("WalletRepository", "Dirección KILT", addressMap["KILT"] ?: "No encontrada")
-                    
-                    _walletAddresses.postValue(addressMap)
-                    onSuccess(addressMap)
-                } else {
-                    Logger.error("WalletRepository", "No se pudieron generar direcciones", "Mapa vacío", null)
-                    onError("No se pudieron generar las direcciones")
-                }
-
-            } catch (e: Exception) {
-                Logger.error("WalletRepository", "Error generando direcciones", e.message ?: "Error desconocido", e)
-                onError("Error generando direcciones: ${e.message}")
-            }
-        }
+        accountDerivationService.deriveFundsAccount(mnemonic, onSuccess, onError)
     }
-
+    
     /**
-     * Paso 4: Crea la wallet final después de confirmación del usuario
+     * Deriva una cuenta de fondos desde un mnemonic (versión con Result)
+     */
+    suspend fun deriveFundsAccountWithResult(mnemonic: String): Result<Map<String, String>> {
+        val result = accountDerivationService.deriveFundsAccountWithResult(mnemonic)
+        if (result.isSuccess) {
+            _walletAddresses.postValue(result.getOrNull())
+        }
+        return result
+    }
+    
+    // ==================== FUNCIONES DE CREACIÓN ====================
+    
+    /**
+     * Crea una wallet final usando WalletManager (versión con callbacks)
      */
     fun createFinalWallet(
         walletName: String,
@@ -131,230 +149,137 @@ class WalletRepository private constructor(private val context: Context) {
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                Logger.debug("WalletRepository", "Creando wallet final", "Nombre: $walletName")
-
-                // Usar WalletManager para crear la wallet final (solo cuenta de fondos)
-                walletManager.createFundsAccountOnly(
-                    name = walletName,
-                    mnemonic = validatedMnemonic, // Usar el mnemonic validado por el usuario
-                    password = null,
-                    cryptoType = EncryptionAlgorithm.SR25519
-                )
-
-                // Observar el resultado en el hilo principal
-                withContext(Dispatchers.Main) {
-                    walletManager.currentWallet.observeForever { wallet ->
-                        if (wallet != null) {
-                            // Persistir la wallet
-                            persistWallet(wallet)
-                            
-                            Logger.success("WalletRepository", "Wallet final creada y persistida", wallet.name)
-                            _currentWallet.postValue(WalletState.Created(wallet))
-                            _isWalletCreated.postValue(true)
-                            onSuccess()
-                        }
-                    }
-
-                    walletManager.error.observeForever { error ->
-                        if (error != null) {
-                            Logger.error("WalletRepository", "Error creando wallet final", error, null)
-                            onError(error)
-                        }
-                    }
-                }
-
-            } catch (e: Exception) {
-                Logger.error("WalletRepository", "Error creando wallet final", e.message ?: "Error desconocido", e)
-                onError("Error creando wallet: ${e.message}")
-            }
-        }
+        walletCreationService.createFinalWallet(
+            walletName = walletName,
+            validatedMnemonic = validatedMnemonic,
+            onSuccess = onSuccess,
+            onError = onError,
+            onWalletCreated = { wallet ->
+                walletStateManager.updateCurrentWalletState(wallet)
+                walletStateManager.persistWallet(wallet)
+            },
+            observers = observers
+        )
     }
+    
+    /**
+     * Versión con Result<T> para creación de wallet final
+     */
+    suspend fun createFinalWalletWithResult(walletName: String, validatedMnemonic: String): Result<Unit> {
+        return walletCreationService.createFinalWalletWithResult(
+            walletName = walletName,
+            validatedMnemonic = validatedMnemonic,
+            onWalletCreated = { wallet ->
+                walletStateManager.updateCurrentWalletState(wallet)
+                walletStateManager.persistWallet(wallet)
+            },
+            observers = observers
+        )
+    }
+    
+    // ==================== FUNCIONES DE ESTADO ====================
     
     /**
      * Obtiene información de la wallet actual
      */
     fun getCurrentWalletInfo(): WalletInfo? {
-        return when (val walletState = _currentWallet.value) {
-            is WalletState.Created -> {
-                val wallet = walletState.wallet
-                val addresses = wallet.metadata["addresses"] as? Map<*, *>
-                val addressMap = addresses?.mapKeys { it.key.toString() }?.mapValues { it.value.toString() } ?: emptyMap()
-                
-                WalletInfo(
-                    name = wallet.name,
-                    address = wallet.address,
-                    kiltAddress = addressMap["KILT"],
-                    polkadotAddress = addressMap["POLKADOT"],
-                    createdAt = wallet.createdAt
-                )
-            }
-            else -> null
-        }
+        return walletStateManager.getCurrentWalletInfo()
     }
     
     /**
      * Obtiene todas las wallets disponibles
      */
     fun getAllWallets(): List<WalletInfo> {
-        return walletManager.wallets.value?.map { wallet ->
-            val addresses = wallet.metadata["addresses"] as? Map<*, *>
-            val addressMap = addresses?.mapKeys { it.key.toString() }?.mapValues { it.value.toString() } ?: emptyMap()
-            
-            WalletInfo(
-                name = wallet.name,
-                address = wallet.address,
-                kiltAddress = addressMap["KILT"],
-                polkadotAddress = addressMap["POLKADOT"],
-                createdAt = wallet.createdAt
-            )
-        } ?: emptyList()
+        return walletStateManager.getAllWallets()
     }
     
     /**
      * Cambia la wallet activa
      */
     fun switchToWallet(walletName: String) {
-        val wallets = walletManager.wallets.value ?: return
-        val targetWallet = wallets.find { it.name == walletName }
-        
-        if (targetWallet != null) {
-            walletManager.selectWallet(targetWallet.id)
-            Logger.debug("WalletRepository", "Wallet cambiada", "Nueva wallet activa: $walletName")
-        } else {
-            Logger.error("WalletRepository", "Wallet no encontrada", "No se encontró wallet con nombre: $walletName", null)
-        }
+        walletStateManager.switchToWallet(walletName)
     }
-
-    /**
-     * Persiste una wallet en SharedPreferences
-     */
-    private fun persistWallet(wallet: Wallet) {
-        try {
-            val walletJson = Gson().toJson(wallet)
-            sharedPreferences.edit()
-                .putString("wallet_${wallet.name}", walletJson)
-                .putString("current_wallet_name", wallet.name)
-                .apply()
-            
-            Logger.success("WalletRepository", "Wallet persistida", "Nombre: ${wallet.name}")
-        } catch (e: Exception) {
-            Logger.error("WalletRepository", "Error persistiendo wallet", e.message ?: "Error desconocido", e)
-        }
-    }
-
-    /**
-     * Carga todas las wallets desde SharedPreferences
-     */
-    private fun loadPersistedWallets(): List<Wallet> {
-        val wallets = mutableListOf<Wallet>()
-        val allKeys = sharedPreferences.all.keys.filter { it.startsWith("wallet_") }
-        
-        for (key in allKeys) {
-            try {
-                val walletJson = sharedPreferences.getString(key, null)
-                if (walletJson != null) {
-                    val wallet = Gson().fromJson(walletJson, Wallet::class.java)
-                    wallets.add(wallet)
-                }
-            } catch (e: Exception) {
-                Logger.error("WalletRepository", "Error cargando wallet", "Key: $key, Error: ${e.message}", e)
-            }
-        }
-        
-        Logger.success("WalletRepository", "Wallets cargadas desde persistencia", "Cantidad: ${wallets.size}")
-        return wallets
-    }
-
-    /**
-     * Carga la wallet activa desde SharedPreferences
-     */
-    private fun loadCurrentWallet(): String? {
-        return sharedPreferences.getString("current_wallet_name", null)
-    }
-
+    
+    // ==================== FUNCIONES DE DID ====================
+    
     /**
      * Deriva DID desde la wallet actual
      */
     fun deriveDidFromCurrentWallet(onSuccess: (String) -> Unit, onError: (String) -> Unit) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                Logger.debug("WalletRepository", "Iniciando derivación DID", "Desde wallet actual")
-                
-                val did = walletManager.deriveDidFromCurrentWallet()
-                
-                if (did != null) {
-                    // Persistir wallet actualizada
-                    val currentWallet = walletManager.currentWallet.value
-                    if (currentWallet != null) {
-                        persistWallet(currentWallet)
-                    }
-                    
-                    Logger.success("WalletRepository", "DID derivado y persistido", "DID: $did")
-                    onSuccess(did)
-                } else {
-                    Logger.error("WalletRepository", "Error derivando DID", "Resultado null", null)
-                    onError("No se pudo derivar el DID")
-                }
-            } catch (e: Exception) {
-                Logger.error("WalletRepository", "Error derivando DID", e.message ?: "Error desconocido", e)
-                onError("Error derivando DID: ${e.message}")
+        walletValidationService.deriveDidFromCurrentWallet(
+            onSuccess = onSuccess,
+            onError = onError,
+            persistWalletCallback = { wallet ->
+                walletStateManager.persistWallet(wallet)
             }
+        )
+    }
+    
+    // ==================== FUNCIONES DE USUARIOS ====================
+    
+    /**
+     * Crea un usuario completo con wallet
+     */
+    suspend fun createCompleteUserWithWallet(userName: String): Result<Unit> {
+        return userWalletService.createCompleteUserWithWallet(userName) { walletName, mnemonic ->
+            createFinalWallet(
+                walletName = walletName,
+                validatedMnemonic = mnemonic,
+                onSuccess = {
+                    Logger.success("WalletRepository", "Wallet creada exitosamente", "Nombre: $walletName")
+                },
+                onError = { error ->
+                    Logger.error("WalletRepository", "Error creando wallet", error, null)
+                }
+            )
         }
     }
-
+    
+    /**
+     * Cambia al usuario especificado
+     */
+    suspend fun switchToUser(userName: String): Result<Unit> {
+        return userWalletService.switchToUser(userName)
+    }
+    
+    /**
+     * Obtiene usuarios sincronizados
+     */
+    suspend fun getSynchronizedUsers(): List<String> {
+        return userWalletService.getSynchronizedUsers()
+    }
+    
+    // ==================== FUNCIONES DE VALIDACIÓN ====================
+    
+    /**
+     * Valida parámetros comunes utilizados en el repositorio
+     */
+    fun validateCommonParameters(walletName: String? = null, mnemonic: String? = null): Result<Unit> {
+        return walletValidationService.validateCommonParameters(walletName, mnemonic)
+    }
+    
+    // ==================== FUNCIONES DE ELIMINACIÓN ====================
+    
+    /**
+     * Borra una wallet por nombre
+     */
+    suspend fun deleteWalletByName(walletName: String): Result<Unit> {
+        return walletDeletionService.deleteWalletByName(walletName)
+    }
+    
+    // ==================== FUNCIONES DE RENOMBRADO ====================
+    
+    /**
+     * Renombra una wallet por nombre
+     */
+    suspend fun renameWalletByName(oldName: String, newName: String): Result<Unit> {
+        return walletRenameService.renameWalletByName(oldName, newName)
+    }
+    
     /**
      * Inicializa el repositorio cargando wallets persistidas
      */
     fun initialize() {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val persistedWallets = loadPersistedWallets()
-                val currentWalletName = loadCurrentWallet()
-                
-                if (persistedWallets.isNotEmpty()) {
-                    // Cargar wallets en WalletManager (debe ejecutarse en Main thread)
-                    withContext(Dispatchers.Main) {
-                        walletManager.loadWallets(persistedWallets)
-                    }
-                    
-                    // Seleccionar wallet activa (debe ejecutarse en Main thread)
-                    if (currentWalletName != null) {
-                        val currentWallet = persistedWallets.find { it.name == currentWalletName }
-                        if (currentWallet != null) {
-                            withContext(Dispatchers.Main) {
-                                walletManager.selectWallet(currentWallet.id)
-                            }
-                            Logger.success("WalletRepository", "Wallet activa restaurada", "Nombre: $currentWalletName")
-                        }
-                    }
-                } else {
-                    Logger.debug("WalletRepository", "No hay wallets persistidas", "Iniciando con lista vacía")
-                }
-            } catch (e: Exception) {
-                Logger.error("WalletRepository", "Error inicializando repositorio", e.message ?: "Error desconocido", e)
-            }
-        }
+        walletStateManager.initialize()
     }
 }
-
-/**
- * Estados posibles de la wallet
- */
-sealed class WalletState {
-    object None : WalletState()
-    data class Created(val wallet: com.aura.substratecryptotest.wallet.Wallet) : WalletState()
-    data class Error(val message: String) : WalletState()
-}
-
-/**
- * Información de la wallet para la UI
- */
-data class WalletInfo(
-    val name: String,
-    val address: String,
-    val kiltAddress: String?,
-    val polkadotAddress: String?,
-    val createdAt: Long
-)

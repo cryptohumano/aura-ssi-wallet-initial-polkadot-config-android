@@ -1,0 +1,105 @@
+# Archivos de privacidad y seguridad
+*.log
+gps_debug.log
+signature_debug.log
+logs_*.log
+*.key
+*.pem
+*.p12
+*.keystore
+*.jks
+*.pfx
+*.crt
+*.cer
+*.der
+
+# Archivos de configuración sensibles
+config.properties
+secrets.properties
+.env
+.env.local
+.env.production
+.env.staging
+local.properties
+
+# Archivos de base de datos locales
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Archivos de usuario y datos personales
+user_data/
+personal_data/
+documents/
+photos/
+images/
+uploads/
+downloads/
+
+# Archivos temporales y cache
+temp/
+tmp/
+cache/
+.cache/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Archivos de Android Studio
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+.DS_Store
+Thumbs.db
+
+# Archivos de compilación
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Archivos de dependencias
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archivos de sistema
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Archivos de backup
+*.backup
+*.bak
+*.orig
+*.rej
+
+# Archivos de testing
+test-results/
+coverage/
+.nyc_output/
+
+# Archivos de documentación temporal
+*.md.backup
+*.txt.backup
+
+# Archivos específicos del proyecto que pueden contener datos sensibles
+temp_aar/
+app/src/main/java/com/aura/substratecryptotest/ui/screens/SettingsScreen.kt.backup
+app/src/main/java/com/aura/substratecryptotest/wallet/WalletManager.kt.backup

@@ -150,3 +150,5 @@ Para verificar el estado:
 val isEnabled = Logger.isEnabled()
 val currentLevel = Logger.getCurrentLevel()
 ```
+
+

@@ -69,3 +69,5 @@ Si las pruebas fallan:
 2. Confirma que las dependencias de BouncyCastle estén presentes
 3. Revisa los logs para identificar errores específicos
 4. Asegúrate de que el mnemonic de prueba sea exacto (sin espacios extra)
+
+

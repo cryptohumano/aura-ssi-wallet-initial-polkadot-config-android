@@ -388,6 +388,16 @@ class HashManager {
             HashAlgorithm.XXHASH_128 -> 16
         }
     }
+    
+    /**
+     * Calcula SHA-256 de un archivo (método de conveniencia)
+     * @param fileBytes Bytes del archivo
+     * @return String con el hash en hexadecimal
+     */
+    suspend fun calculateSHA256(fileBytes: ByteArray): String {
+        val result = sha256(fileBytes)
+        return result.hex
+    }
 }
 
 /**

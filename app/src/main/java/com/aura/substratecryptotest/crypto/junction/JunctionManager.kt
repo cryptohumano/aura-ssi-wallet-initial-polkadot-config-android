@@ -135,6 +135,11 @@ class JunctionManager {
         val PARA_VALIDATOR = DerivationPath(listOf(Junction(JunctionType.HARD, "para_validator".toByteArray())))
         val PARA_ASSIGNMENT = DerivationPath(listOf(Junction(JunctionType.HARD, "para_assignment".toByteArray())))
         val AUTHORITY_DISCOVERY = DerivationPath(listOf(Junction(JunctionType.HARD, "authority_discovery".toByteArray())))
+        
+        // Rutas específicas para DIDs KILT
+        val DID_AUTHENTICATION = DerivationPath(listOf(Junction(JunctionType.HARD, "did".toByteArray()), Junction(JunctionType.HARD, "0".toByteArray())))
+        val DID_ASSERTION = DerivationPath(listOf(Junction(JunctionType.HARD, "did".toByteArray()), Junction(JunctionType.HARD, "1".toByteArray())))
+        val DID_DELEGATION = DerivationPath(listOf(Junction(JunctionType.HARD, "did".toByteArray()), Junction(JunctionType.HARD, "2".toByteArray())))
     }
     
     /**
@@ -299,7 +304,12 @@ class JunctionManager {
             "imonline" to CommonPaths.IMONLINE,
             "para_validator" to CommonPaths.PARA_VALIDATOR,
             "para_assignment" to CommonPaths.PARA_ASSIGNMENT,
-            "authority_discovery" to CommonPaths.AUTHORITY_DISCOVERY
+            "authority_discovery" to CommonPaths.AUTHORITY_DISCOVERY,
+            
+            // DIDs KILT
+            "did_auth" to CommonPaths.DID_AUTHENTICATION,
+            "did_assertion" to CommonPaths.DID_ASSERTION,
+            "did_delegation" to CommonPaths.DID_DELEGATION
         )
     }
     
@@ -338,5 +348,37 @@ class JunctionManager {
                 false
             }
         }
+    }
+    
+    /**
+     * Obtiene el path de derivación para DID KILT de autenticación (//did//0)
+     */
+    fun getKiltDidAuthenticationPath(): DerivationPath {
+        return CommonPaths.DID_AUTHENTICATION
+    }
+    
+    /**
+     * Obtiene el path de derivación para DID KILT de aserción (//did//1)
+     */
+    fun getKiltDidAssertionPath(): DerivationPath {
+        return CommonPaths.DID_ASSERTION
+    }
+    
+    /**
+     * Obtiene el path de derivación para DID KILT de delegación (//did//2)
+     */
+    fun getKiltDidDelegationPath(): DerivationPath {
+        return CommonPaths.DID_DELEGATION
+    }
+    
+    /**
+     * Obtiene todos los paths de DIDs KILT disponibles
+     */
+    fun getKiltDidPaths(): Map<String, DerivationPath> {
+        return mapOf(
+            "authentication" to CommonPaths.DID_AUTHENTICATION,
+            "assertion" to CommonPaths.DID_ASSERTION,
+            "delegation" to CommonPaths.DID_DELEGATION
+        )
     }
 }

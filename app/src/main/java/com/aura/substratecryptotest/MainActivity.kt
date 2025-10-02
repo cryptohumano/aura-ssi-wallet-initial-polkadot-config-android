@@ -17,8 +17,9 @@ import com.aura.substratecryptotest.ui.ImportExportFragment
 import com.aura.substratecryptotest.ui.SS58ToolsFragment
 import com.aura.substratecryptotest.ui.NetworkStatusFragment
 import com.aura.substratecryptotest.ui.SigningFragment
-import com.aura.substratecryptotest.ui.TestCryptoFragment
+import com.aura.substratecryptotest.ui.settings.SettingsFragment
 import com.aura.substratecryptotest.utils.Logger
+import com.aura.substratecryptotest.data.database.AppDatabaseManager
 // import com.aura.substratecryptotest.ui.SDKVerificationFragment
 // import com.aura.substratecryptotest.crypto.SubstrateCryptoManager
 import com.aura.substratecryptotest.crypto.keypair.EncryptionAlgorithm
@@ -44,9 +45,79 @@ class MainActivity : AppCompatActivity() {
         networkManager = com.aura.substratecryptotest.network.NetworkManager(this)
         // cryptoManager = SubstrateCryptoManager()
 
+        // Ejecutar migración de bitácoras existentes
+        runMigrationIfNeeded()
+
         setupViewPager()
         setupFAB()
         setupLogging()
+        
+        // Cargar wallets existentes desde el repositorio seguro
+        // loadExistingWallets()
+        
+        // Ejecutar prueba de integración (opcional - comentar en producción)
+        // runIntegrationTest()
+    }
+
+    /*
+    /**
+     * Carga wallets existentes desde el repositorio seguro
+     */
+    private fun loadExistingWallets() {
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                Logger.debug("MainActivity", "Cargando wallets existentes...")
+                walletManager.loadWalletsFromSecureRepository()
+                Logger.success("MainActivity", "Wallets cargadas exitosamente", "Cantidad: ${walletManager.wallets.value?.size ?: 0}")
+            } catch (e: Exception) {
+                Logger.error("MainActivity", "Error cargando wallets existentes", e.message ?: "Error desconocido", e)
+            }
+        }
+    }
+
+    /**
+     * Ejecuta prueba de integración del sistema
+     */
+    private fun runIntegrationTest() {
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                Logger.debug("MainActivity", "🧪 Ejecutando prueba de integración...")
+                val testResult = walletManager.testIntegration()
+                
+                if (testResult) {
+                    Logger.success("MainActivity", "✅ Prueba de integración EXITOSA", "Sistema funcionando correctamente")
+                    Toast.makeText(this@MainActivity, "✅ Integración exitosa", Toast.LENGTH_LONG).show()
+                } else {
+                    Logger.error("MainActivity", "❌ Prueba de integración FALLIDA", "Revisar logs para detalles")
+                    Toast.makeText(this@MainActivity, "❌ Error en integración", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                Logger.error("MainActivity", "❌ Error ejecutando prueba de integración", e.message ?: "Error desconocido", e)
+                Toast.makeText(this@MainActivity, "❌ Error en prueba: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    */
+    
+    /**
+     * Ejecuta la migración de bitácoras existentes si es necesario
+     */
+    private fun runMigrationIfNeeded() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                Logger.i("MainActivity", "Iniciando migración de bitácoras existentes...")
+                val appDatabaseManager = AppDatabaseManager(this@MainActivity)
+                val success = appDatabaseManager.migrationService.runCompleteMigrationIfNeeded()
+                
+                if (success) {
+                    Logger.success("MainActivity", "Migración de bitácoras completada exitosamente")
+                } else {
+                    Logger.warning("MainActivity", "Migración de bitácoras falló o no fue necesaria", "")
+                }
+            } catch (e: Exception) {
+                Logger.error("MainActivity", "Error durante la migración: ${e.message}", e.message ?: "Error desconocido", e)
+            }
+        }
     }
 
     private fun setupViewPager() {
@@ -61,7 +132,7 @@ class MainActivity : AppCompatActivity() {
                 3 -> "SS58 Tools"
                 4 -> "Redes"
                 5 -> "Firmar"
-                6 -> "Prueba ETH"
+                6 -> "Configuración"
                 else -> ""
             }
         }.attach()
@@ -256,7 +327,7 @@ class MainActivity : AppCompatActivity() {
                 3 -> SS58ToolsFragment.newInstance()
                 4 -> NetworkStatusFragment.newInstance()
                 5 -> SigningFragment.newInstance()
-                6 -> TestCryptoFragment()
+                6 -> SettingsFragment()
                 else -> throw IllegalArgumentException("Invalid position: $position")
             }
         }

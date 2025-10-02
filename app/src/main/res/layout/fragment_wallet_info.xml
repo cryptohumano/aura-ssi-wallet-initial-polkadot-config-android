@@ -539,6 +539,15 @@
 
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- API Client Test Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTestApiClient"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🌐 Probar API Client"
+                android:textSize="14sp"
+                style="@style/Widget.Material3.Button" />
+
             <!-- Refresh Button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRefresh"

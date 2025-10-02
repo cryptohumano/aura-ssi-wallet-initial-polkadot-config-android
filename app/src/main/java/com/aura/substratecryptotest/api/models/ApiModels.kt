@@ -150,3 +150,9 @@ class ApiException(
     val error: ApiError,
     message: String? = null
 ) : Exception(message ?: error.message)
+
+
+
+
+
+

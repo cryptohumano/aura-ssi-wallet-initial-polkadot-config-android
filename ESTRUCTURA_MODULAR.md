@@ -16,6 +16,10 @@ com.aura.substratecryptotest.crypto/
 │   └── HashManager.kt              # ✅ IMPLEMENTED - Funciones de hashing
 ├── ss58/
 │   └── SS58Encoder.kt              # ✅ IMPLEMENTED - Codificación de direcciones
+├── kilt/
+│   ├── KiltDidManager.kt           # ✅ IMPLEMENTED - Gestión de DIDs KILT
+│   ├── KiltSignatureManager.kt     # ✅ IMPLEMENTED - Firmas DID KILT
+│   └── KiltProtocolManager.kt      # ✅ IMPLEMENTED - Gestor principal KILT
 ├── StorageManager.kt               # ✅ IMPLEMENTED - Almacenamiento seguro
 ├── DependencyChecker.kt            # ❌ OBSOLETE - Verificador de dependencias
 └── SDKVerificationManager.kt       # ❌ OBSOLETE - Verificador del SDK
@@ -206,7 +210,89 @@ val publicKey = ss58Encoder.decode(address)
 val isValid = ss58Encoder.validateAddress(address)
 ```
 
-### 6. StorageManager
+### 6. KiltDidManager
+**Ubicación:** `crypto.kilt.KiltDidManager`
+**Estado:** ✅ **IMPLEMENTED & READY**
+
+**Funcionalidades:**
+- ✅ Generación de DIDs KILT con path `//did//0`
+- ✅ Derivación de múltiples DIDs para diferentes propósitos
+- ✅ Validación de DIDs KILT (Full y Light)
+- ✅ Extracción de direcciones desde DIDs
+- ✅ Mapeo de métodos de runtime a relaciones de verificación
+- ✅ Generación de nonces para transacciones DID
+- ✅ Soporte para relaciones de verificación (authentication, assertion, delegation)
+
+**Uso:**
+```kotlin
+val kiltDidManager = KiltDidManager()
+
+// Generar DID único
+val didInfo = kiltDidManager.generateKiltDid(mnemonic, password)
+
+// Generar múltiples DIDs
+val multipleDids = kiltDidManager.generateMultipleKiltDids(mnemonic, password)
+
+// Validar DID
+val isValid = kiltDidManager.validateKiltDid("did:kilt:4...")
+```
+
+### 7. KiltSignatureManager
+**Ubicación:** `crypto.kilt.KiltSignatureManager`
+**Estado:** ✅ **IMPLEMENTED & READY**
+
+**Funcionalidades:**
+- ✅ Autorización de transacciones con DIDs KILT
+- ✅ Autorización de lotes de transacciones
+- ✅ Creación de firmas DID
+- ✅ Verificación de firmas DID
+- ✅ Análisis de transacciones para determinar tipo de firma requerida
+- ✅ Agrupación de transacciones por relación de verificación
+
+**Uso:**
+```kotlin
+val signatureManager = KiltSignatureManager()
+
+// Autorizar transacción
+val authorization = signatureManager.authorizeTransaction(
+    didInfo, extrinsic, AuthorizationOptions(submitter = address)
+)
+
+// Autorizar lote
+val batchAuth = signatureManager.authorizeBatch(didInfo, extrinsics, options)
+```
+
+### 8. KiltProtocolManager
+**Ubicación:** `crypto.kilt.KiltProtocolManager`
+**Estado:** ✅ **IMPLEMENTED & READY**
+
+**Funcionalidades:**
+- ✅ Creación de wallets KILT completos
+- ✅ Restauración de wallets desde mnemonic
+- ✅ Integración completa con todos los componentes KILT
+- ✅ Autorización de transacciones y lotes
+- ✅ Análisis y validación de transacciones
+- ✅ Estadísticas de wallets KILT
+
+**Uso:**
+```kotlin
+val kiltManager = KiltProtocolManager()
+
+// Crear wallet KILT completo
+val wallet = kiltManager.createKiltWallet(
+    KiltWalletOptions(
+        mnemonicLength = Mnemonic.Length.TWELVE,
+        generateMultipleDids = true
+    )
+)
+
+// Autorizar transacción
+val authTx = kiltManager.authorizeTransaction(
+    wallet, extrinsic, "authentication", submitterAddress
+)
+```
+
+### 9. StorageManager
 **Ubicación:** `crypto.StorageManager`
 **Estado:** ✅ **IMPLEMENTED & READY**
 

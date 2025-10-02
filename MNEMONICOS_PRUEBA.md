@@ -252,3 +252,5 @@ I WalletManager: 🎉 PRUEBA SUBSTRATE EXITOSA
 ---
 
 **Conclusión**: Estos mnemónicos de prueba te permiten verificar que tu implementación de SR25519 es correcta y compatible con el ecosistema Substrate/Polkadot. Las pruebas automáticas te dan confianza en que las claves generadas son válidas y seguras.
+
+

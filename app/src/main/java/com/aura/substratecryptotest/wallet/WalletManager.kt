@@ -15,6 +15,10 @@ import com.aura.substratecryptotest.crypto.ss58.SS58Encoder
 import com.aura.substratecryptotest.crypto.kilt.KiltProtocolManager
 import com.aura.substratecryptotest.crypto.kilt.KiltDidManager
 import com.aura.substratecryptotest.utils.Logger
+import com.aura.substratecryptotest.data.database.AppDatabaseManager
+import com.aura.substratecryptotest.data.user.UserManagementService
+import com.aura.substratecryptotest.data.SecureUserRepository
+import com.aura.substratecryptotest.data.UserWallet
 import io.novasama.substrate_sdk_android.encrypt.mnemonic.Mnemonic
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,6 +34,9 @@ class WalletManager(private val context: Context) : ViewModel() {
     private val keyVerificationManager = KeyVerificationManager()
     private val ss58Encoder = SS58Encoder()
     private val kiltProtocolManager = KiltProtocolManager()
+    
+    // Repositorio seguro para persistencia
+    private val secureUserRepository = SecureUserRepository.getInstance(context)
     
     private val _wallets = MutableLiveData<List<Wallet>>()
     private val _currentWallet = MutableLiveData<Wallet?>()
@@ -87,10 +94,10 @@ class WalletManager(private val context: Context) : ViewModel() {
                 _error.value = null
                 
                 Logger.i("WalletManager", "🚀 Iniciando creación de cuenta de fondos (sin DID)...")
-                Logger.debug("WalletManager", "Configuración", "Nombre: $name, Algoritmo: $cryptoType, Mnemonic: ${mnemonic.take(20)}...")
+                Logger.debug("WalletManager", "Configuración", "Nombre: $name, Algoritmo: $cryptoType, Mnemonic completo: $mnemonic")
                 
                 // Usar el mnemonic proporcionado
-                Logger.success("WalletManager", "Mnemonic recibido", "${mnemonic.take(20)}...")
+                Logger.success("WalletManager", "Mnemonic recibido", "Mnemonic completo: $mnemonic")
                 
                 // Generar par de claves real usando KeyPairManager (sin path)
                 val keyPairInfo = when (cryptoType) {
@@ -156,6 +163,9 @@ class WalletManager(private val context: Context) : ViewModel() {
                 _wallets.value = currentWallets
                 _currentWallet.value = wallet
                 
+                // ✅ LOGGING: Mnemonic guardado en la wallet
+                Logger.success("WalletManager", "✅ Mnemonic guardado en wallet", "Wallet: ${wallet.name}, Mnemonic: ${wallet.mnemonic}")
+                
             } catch (e: Exception) {
                 _error.value = "Error al crear cuenta de fondos: ${e.message}"
             } finally {
@@ -179,10 +189,10 @@ class WalletManager(private val context: Context) : ViewModel() {
                 _error.value = null
                 
                 Logger.i("WalletManager", "🚀 Iniciando creación de wallet desde mnemonic...")
-                Logger.debug("WalletManager", "Configuración", "Nombre: $name, Algoritmo: $cryptoType, Mnemonic: ${mnemonic.take(20)}...")
+                Logger.debug("WalletManager", "Configuración", "Nombre: $name, Algoritmo: $cryptoType, Mnemonic completo: $mnemonic")
                 
                 // Usar el mnemonic proporcionado
-                Logger.success("WalletManager", "Mnemonic recibido", "${mnemonic.take(20)}...")
+                Logger.success("WalletManager", "Mnemonic recibido", "Mnemonic completo: $mnemonic")
                 
                 // Generar par de claves real usando KeyPairManager
                 val keyPairInfo = when (cryptoType) {
@@ -225,14 +235,14 @@ class WalletManager(private val context: Context) : ViewModel() {
                 val addresses = generateMultipleAddresses(keyPairInfo.publicKey)
                 val mainAddress = addresses[SS58Encoder.NetworkPrefix.SUBSTRATE] ?: generateAddress(keyPairInfo.publicKey)
                 
-                // Generar direcciones DID derivadas para KILT y Polkadot (con path //did//0)
+                // Generar direcciones DID derivadas para KILT, Polkadot y Kusama (con path //did//0)
                 val didDerivedAddresses = generateDidDerivedAddresses(mnemonic, password)
                 
                 // Combinar direcciones: normales + DID derivadas
                 val allAddresses = addresses.toMutableMap()
                 allAddresses.putAll(didDerivedAddresses)
                 
-                Logger.i("WalletManager", "🆔 Wallet Substrate creada con derivaciones duales - KILT y Polkadot tienen ambas derivaciones")
+                Logger.i("WalletManager", "🆔 Wallet Substrate creada con derivaciones duales - KILT, Polkadot y Kusama tienen ambas derivaciones")
                 
                 val wallet = Wallet(
                     id = generateWalletId(),
@@ -255,6 +265,10 @@ class WalletManager(private val context: Context) : ViewModel() {
                             "polkadot" to mapOf(
                                 "base" to addresses[SS58Encoder.NetworkPrefix.POLKADOT],
                                 "did" to didDerivedAddresses[SS58Encoder.NetworkPrefix.POLKADOT]
+                            ),
+                            "kusama" to mapOf(
+                                "base" to addresses[SS58Encoder.NetworkPrefix.KUSAMA],
+                                "did" to didDerivedAddresses[SS58Encoder.NetworkPrefix.KUSAMA]
                             )
                         )
                     ),
@@ -273,6 +287,9 @@ class WalletManager(private val context: Context) : ViewModel() {
                 currentWallets.add(wallet)
                 _wallets.value = currentWallets
                 _currentWallet.value = wallet
+                
+                // ✅ LOGGING: Mnemonic guardado en la wallet
+                Logger.success("WalletManager", "✅ Mnemonic guardado en wallet", "Wallet: ${wallet.name}, Mnemonic: ${wallet.mnemonic}")
                 
             } catch (e: Exception) {
                 _error.value = "Error al crear wallet: ${e.message}"
@@ -301,7 +318,7 @@ class WalletManager(private val context: Context) : ViewModel() {
                 
                 // Generar mnemonic real usando MnemonicManager
                 val mnemonic = mnemonicManager.generateMnemonic(mnemonicLength)
-                Logger.success("WalletManager", "Mnemonic generado", "${mnemonic.take(20)}...")
+                Logger.success("WalletManager", "Mnemonic generado", "Mnemonic completo: $mnemonic")
                 
                 // Generar par de claves real usando KeyPairManager
                 val keyPairInfo = when (cryptoType) {
@@ -344,14 +361,14 @@ class WalletManager(private val context: Context) : ViewModel() {
                 val addresses = generateMultipleAddresses(keyPairInfo.publicKey)
                 val mainAddress = addresses[SS58Encoder.NetworkPrefix.SUBSTRATE] ?: generateAddress(keyPairInfo.publicKey)
                 
-                // Generar direcciones DID derivadas para KILT y Polkadot (con path //did//0)
+                // Generar direcciones DID derivadas para KILT, Polkadot y Kusama (con path //did//0)
                 val didDerivedAddresses = generateDidDerivedAddresses(mnemonic, password)
                 
                 // Combinar direcciones: normales + DID derivadas
                 val allAddresses = addresses.toMutableMap()
                 allAddresses.putAll(didDerivedAddresses)
                 
-                Logger.i("WalletManager", "🆔 Wallet Substrate creada con derivaciones duales - KILT y Polkadot tienen ambas derivaciones")
+                Logger.i("WalletManager", "🆔 Wallet Substrate creada con derivaciones duales - KILT, Polkadot y Kusama tienen ambas derivaciones")
                 
                 val wallet = Wallet(
                     id = generateWalletId(),
@@ -374,6 +391,10 @@ class WalletManager(private val context: Context) : ViewModel() {
                             "polkadot" to mapOf(
                                 "base" to addresses[SS58Encoder.NetworkPrefix.POLKADOT],
                                 "did" to didDerivedAddresses[SS58Encoder.NetworkPrefix.POLKADOT]
+                            ),
+                            "kusama" to mapOf(
+                                "base" to addresses[SS58Encoder.NetworkPrefix.KUSAMA],
+                                "did" to didDerivedAddresses[SS58Encoder.NetworkPrefix.KUSAMA]
                             )
                         )
                     ),
@@ -392,6 +413,9 @@ class WalletManager(private val context: Context) : ViewModel() {
                 currentWallets.add(wallet)
                 _wallets.value = currentWallets
                 _currentWallet.value = wallet
+                
+                // ✅ LOGGING: Mnemonic guardado en la wallet
+                Logger.success("WalletManager", "✅ Mnemonic guardado en wallet", "Wallet: ${wallet.name}, Mnemonic: ${wallet.mnemonic}")
                 
             } catch (e: Exception) {
                 _error.value = "Error al crear wallet: ${e.message}"
@@ -429,6 +453,9 @@ class WalletManager(private val context: Context) : ViewModel() {
                 _wallets.value = currentWallets
                 _currentWallet.value = wallet
                 
+                // ✅ LOGGING: Mnemonic guardado en la wallet
+                Logger.success("WalletManager", "✅ Mnemonic guardado en wallet", "Wallet: ${wallet.name}, Mnemonic: ${wallet.mnemonic}")
+                
             } catch (e: Exception) {
                 _error.value = "Error al importar wallet: ${e.message}"
             } finally {
@@ -455,6 +482,30 @@ class WalletManager(private val context: Context) : ViewModel() {
         
         if (_currentWallet.value?.id == walletId) {
             _currentWallet.value = null
+        }
+    }
+    
+    /**
+     * Renombra una wallet
+     */
+    fun renameWallet(walletId: String, newName: String) {
+        val currentWallets = _wallets.value?.toMutableList() ?: mutableListOf()
+        val walletIndex = currentWallets.indexOfFirst { it.id == walletId }
+        
+        if (walletIndex != -1) {
+            val wallet = currentWallets[walletIndex]
+            val renamedWallet = wallet.copy(name = newName)
+            currentWallets[walletIndex] = renamedWallet
+            _wallets.value = currentWallets
+            
+            // Actualizar wallet actual si es la que se está renombrando
+            if (_currentWallet.value?.id == walletId) {
+                _currentWallet.value = renamedWallet
+            }
+            
+            Logger.success("WalletManager", "Wallet renombrada", "ID: $walletId, Nuevo nombre: $newName")
+        } else {
+            Logger.error("WalletManager", "Wallet no encontrada para renombrar", "ID: $walletId", null)
         }
     }
     
@@ -681,6 +732,61 @@ class WalletManager(private val context: Context) : ViewModel() {
     }
 
     /**
+     * Carga wallets desde el repositorio seguro
+     */
+    suspend fun loadWalletsFromSecureRepository() {
+        try {
+            Logger.debug("WalletManager", "Cargando wallets desde repositorio seguro...", "")
+            
+            val userWallets = secureUserRepository.getUserWallets()
+            val wallets = userWallets.map { userWallet ->
+                convertUserWalletToWallet(userWallet)
+            }
+            
+            _wallets.postValue(wallets)
+            if (wallets.isNotEmpty()) {
+                _currentWallet.postValue(wallets.first())
+                Logger.success("WalletManager", "Wallet activa establecida", "Nombre: ${wallets.first().name}")
+            } else {
+                _currentWallet.postValue(null)
+                Logger.debug("WalletManager", "No hay wallets para establecer como activa", "")
+            }
+            
+            Logger.success("WalletManager", "Wallets cargadas desde repositorio seguro", "Cantidad: ${wallets.size}")
+        } catch (e: Exception) {
+            Logger.error("WalletManager", "Error cargando wallets desde repositorio seguro", e.message ?: "Error desconocido", e)
+            _error.postValue("Error cargando wallets: ${e.message}")
+        }
+    }
+    
+    /**
+     * Convierte UserWallet a Wallet para compatibilidad
+     */
+    private suspend fun convertUserWalletToWallet(userWallet: UserWallet): Wallet {
+        val mnemonicResult = secureUserRepository.getWalletMnemonic(userWallet.id, requireBiometric = false)
+        val mnemonic = mnemonicResult.getOrNull() ?: ""
+        
+        // Decodificar clave pública
+        val publicKey = android.util.Base64.decode(userWallet.publicKey, android.util.Base64.DEFAULT)
+        
+        return Wallet(
+            id = userWallet.id,
+            name = userWallet.name,
+            mnemonic = mnemonic,
+            publicKey = publicKey,
+            privateKey = null, // No se carga la clave privada por seguridad
+            address = userWallet.address,
+            cryptoType = EncryptionAlgorithm.valueOf(userWallet.cryptoType),
+            derivationPath = userWallet.derivationPath,
+            createdAt = userWallet.createdAt,
+            metadata = emptyMap(), // TODO: Parsear metadata JSON
+            kiltDid = null,
+            kiltAddress = null,
+            kiltDids = null
+        )
+    }
+
+    /**
      * Carga wallets desde persistencia
      */
     fun loadWallets(wallets: List<Wallet>) {
@@ -696,48 +802,146 @@ class WalletManager(private val context: Context) : ViewModel() {
      */
     suspend fun deriveDidFromCurrentWallet(): String? {
         return try {
-            val currentWallet = _currentWallet.value ?: return null
+            val currentWallet = _currentWallet.value ?: run {
+                android.util.Log.e("WalletManager", "❌ No hay wallet actual para derivar DID")
+                return null
+            }
             
             Logger.debug("WalletManager", "Derivando DID desde wallet", "Wallet: ${currentWallet.name}")
+            android.util.Log.d("WalletManager", "=== DERIVANDO DID DESDE WALLET ===")
+            android.util.Log.d("WalletManager", "Wallet: ${currentWallet.name}")
+            android.util.Log.d("WalletManager", "Mnemonic disponible: ${currentWallet.mnemonic.isNotEmpty()}")
+            android.util.Log.d("WalletManager", "Mnemonic palabras: ${currentWallet.mnemonic.split(" ").size}")
             
-            // Generar par de claves con derivación DID
-            val keyPairInfo = keyPairManager.generateKeyPairWithPath(
-                algorithm = EncryptionAlgorithm.SR25519,
-                mnemonic = currentWallet.mnemonic,
-                derivationPath = "//did//0",
-                password = null
-            )
+            // Generar direcciones DID para múltiples redes usando la función existente
+            android.util.Log.d("WalletManager", "Generando direcciones DID para múltiples redes...")
+            val didDerivedAddresses = generateDidDerivedAddresses(currentWallet.mnemonic, null)
             
-            if (keyPairInfo != null) {
-                Logger.success("WalletManager", "Par de claves DID generado", 
-                    "Clave pública: ${keyPairInfo.publicKey.size} bytes")
+            if (didDerivedAddresses.isNotEmpty()) {
+                // Obtener la clave pública derivada para actualizar la wallet
+                val keyPairInfo = keyPairManager.generateKeyPairWithPath(
+                    algorithm = EncryptionAlgorithm.SR25519,
+                    mnemonic = currentWallet.mnemonic,
+                    derivationPath = "//did//0",
+                    password = null
+                )
                 
-                // Generar dirección KILT con derivación DID
-                val kiltAddress = ss58Encoder.encode(keyPairInfo.publicKey, SS58Encoder.NetworkPrefix.KILT)
-                
-                // Crear DID con prefijo did:kilt:
-                val did = "did:kilt:$kiltAddress"
-                
-                Logger.success("WalletManager", "DID derivado exitosamente", "DID: $did")
-                Logger.debug("WalletManager", "Dirección KILT DID", kiltAddress)
-                
-                // Actualizar wallet con información DID
-                updateWalletWithDid(currentWallet, did, kiltAddress, keyPairInfo.publicKey)
-                
-                Logger.success("WalletManager", "DID retornado exitosamente", "DID: $did")
-                did
+                if (keyPairInfo != null) {
+                    Logger.success("WalletManager", "Par de claves DID generado", 
+                        "Clave pública: ${keyPairInfo.publicKey.size} bytes")
+                    android.util.Log.d("WalletManager", "✅ Par de claves DID generado")
+                    android.util.Log.d("WalletManager", "Clave pública: ${keyPairInfo.publicKey.size} bytes")
+                    
+                    // Obtener direcciones DID para cada red
+                    val kiltAddress = didDerivedAddresses[SS58Encoder.NetworkPrefix.KILT]
+                    val polkadotAddress = didDerivedAddresses[SS58Encoder.NetworkPrefix.POLKADOT]
+                    val kusamaAddress = didDerivedAddresses[SS58Encoder.NetworkPrefix.KUSAMA]
+                    
+                    android.util.Log.d("WalletManager", "Dirección KILT DID: $kiltAddress")
+                    android.util.Log.d("WalletManager", "Dirección Polkadot DID: $polkadotAddress")
+                    android.util.Log.d("WalletManager", "Dirección Kusama DID: $kusamaAddress")
+                    
+                    // Crear DID principal con prefijo did:kilt: (mantener compatibilidad)
+                    val mainDid = "did:kilt:$kiltAddress"
+                    android.util.Log.d("WalletManager", "DID principal creado: $mainDid")
+                    
+                    Logger.success("WalletManager", "DID derivado exitosamente", "DID: $mainDid")
+                    Logger.debug("WalletManager", "Dirección KILT DID", kiltAddress ?: "No disponible")
+                    
+                    // Actualizar wallet con información DID completa (múltiples redes)
+                    android.util.Log.d("WalletManager", "Actualizando wallet con información DID...")
+                    updateWalletWithMultiNetworkDid(currentWallet, mainDid, didDerivedAddresses, keyPairInfo.publicKey)
+                    
+                    Logger.success("WalletManager", "DID retornado exitosamente", "DID: $mainDid")
+                    android.util.Log.d("WalletManager", "✅ DID derivado y retornado exitosamente: $mainDid")
+                    mainDid
+                } else {
+                    Logger.error("WalletManager", "Error generando par de claves DID", "KeyPairInfo es null", null)
+                    android.util.Log.e("WalletManager", "❌ Error generando par de claves DID - KeyPairInfo es null")
+                    null
+                }
             } else {
-                Logger.error("WalletManager", "Error generando par de claves DID", "KeyPairInfo es null", null)
+                Logger.error("WalletManager", "Error generando direcciones DID", "No se generaron direcciones", null)
+                android.util.Log.e("WalletManager", "❌ Error generando direcciones DID - No se generaron direcciones")
                 null
             }
         } catch (e: Exception) {
             Logger.error("WalletManager", "Error derivando DID", e.message ?: "Error desconocido", e)
+            android.util.Log.e("WalletManager", "❌ Error derivando DID: ${e.message}", e)
             null
         }
     }
 
     /**
-     * Actualiza la wallet con información DID derivada
+     * Actualiza la wallet con información DID derivada para múltiples redes
+     */
+    private suspend fun updateWalletWithMultiNetworkDid(
+        wallet: Wallet, 
+        mainDid: String, 
+        didDerivedAddresses: Map<SS58Encoder.NetworkPrefix, String>, 
+        publicKey: ByteArray
+    ) {
+        try {
+            Logger.debug("WalletManager", "Actualizando wallet con DID multi-red", "Wallet ID: ${wallet.id}, DID: $mainDid")
+            android.util.Log.d("WalletManager", "🔍 Actualizando wallet con DID: Wallet ID: ${wallet.id}, DID: $mainDid")
+            
+            // Crear mapa de direcciones DID para cada red
+            val multiNetworkAddresses = mutableMapOf<String, String>()
+            didDerivedAddresses.forEach { (network, address) ->
+                when (network) {
+                    SS58Encoder.NetworkPrefix.KILT -> multiNetworkAddresses["KILT"] = address
+                    SS58Encoder.NetworkPrefix.POLKADOT -> multiNetworkAddresses["POLKADOT"] = address
+                    SS58Encoder.NetworkPrefix.KUSAMA -> multiNetworkAddresses["KUSAMA"] = address
+                    else -> multiNetworkAddresses[network.name] = address
+                }
+            }
+            
+            val updatedWallet = wallet.copy(
+                kiltDid = mainDid,
+                kiltAddress = didDerivedAddresses[SS58Encoder.NetworkPrefix.KILT],
+                kiltDids = mapOf(
+                    "authentication" to mainDid,
+                    "address" to (didDerivedAddresses[SS58Encoder.NetworkPrefix.KILT] ?: ""),
+                    "publicKey" to publicKey.joinToString("") { "%02x".format(it) },
+                    "kilt" to (didDerivedAddresses[SS58Encoder.NetworkPrefix.KILT] ?: ""),
+                    "polkadot" to (didDerivedAddresses[SS58Encoder.NetworkPrefix.POLKADOT] ?: ""),
+                    "kusama" to (didDerivedAddresses[SS58Encoder.NetworkPrefix.KUSAMA] ?: "")
+                )
+            )
+            
+            Logger.debug("WalletManager", "Wallet copiada exitosamente", "Nuevo DID: ${updatedWallet.kiltDid}")
+            android.util.Log.d("WalletManager", "🔍 Wallet copiada exitosamente: Nuevo DID: ${updatedWallet.kiltDid}")
+            
+            // Actualizar en el hilo principal
+            withContext(Dispatchers.Main) {
+                // Actualizar en la lista de wallets
+                val currentWallets = _wallets.value?.toMutableList() ?: mutableListOf()
+                val index = currentWallets.indexOfFirst { it.id == wallet.id }
+                if (index >= 0) {
+                    currentWallets[index] = updatedWallet
+                    _wallets.value = currentWallets
+                    Logger.debug("WalletManager", "Wallet actualizada en lista", "Índice: $index")
+                    android.util.Log.d("WalletManager", "🔍 Wallet actualizada en lista: Índice: $index")
+                } else {
+                    Logger.warning("WalletManager", "Wallet no encontrada en lista", "ID: ${wallet.id}")
+                }
+                
+                // Actualizar wallet actual
+                _currentWallet.value = updatedWallet
+                Logger.debug("WalletManager", "Wallet actual establecida", "DID: ${_currentWallet.value?.kiltDid}")
+                android.util.Log.d("WalletManager", "🔍 Wallet actual establecida: DID: ${_currentWallet.value?.kiltDid}")
+            }
+            
+            Logger.success("WalletManager", "Wallet actualizada con DID multi-red exitosamente", "DID: $mainDid")
+            android.util.Log.d("WalletManager", "✅ Wallet actualizada con DID exitosamente: DID: $mainDid")
+        } catch (e: Exception) {
+            Logger.error("WalletManager", "Error actualizando wallet con DID multi-red", e.message ?: "Error desconocido", e)
+            android.util.Log.e("WalletManager", "❌ Error actualizando wallet con DID multi-red: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Actualiza la wallet con información DID derivada (versión legacy)
      */
     private suspend fun updateWalletWithDid(wallet: Wallet, did: String, kiltAddress: String, publicKey: ByteArray) {
         try {
@@ -817,7 +1021,7 @@ class WalletManager(private val context: Context) : ViewModel() {
     }
     
     /**
-     * Genera direcciones con derivación //did//0 para KILT y Polkadot
+     * Genera direcciones con derivación //did//0 para KILT, Polkadot y Kusama
      */
     private suspend fun generateDidDerivedAddresses(mnemonic: String, password: String?): Map<SS58Encoder.NetworkPrefix, String> {
         return try {
@@ -833,15 +1037,17 @@ class WalletManager(private val context: Context) : ViewModel() {
             )
             
             if (keyPairInfo != null) {
-                // Generar direcciones KILT y Polkadot con la clave derivada
+                // Generar direcciones KILT, Polkadot y Kusama con la clave derivada
                 val kiltDidAddress = ss58Encoder.encode(keyPairInfo.publicKey, SS58Encoder.NetworkPrefix.KILT)
                 val polkadotDidAddress = ss58Encoder.encode(keyPairInfo.publicKey, SS58Encoder.NetworkPrefix.POLKADOT)
+                val kusamaDidAddress = ss58Encoder.encode(keyPairInfo.publicKey, SS58Encoder.NetworkPrefix.KUSAMA)
                 
                 didDerivedAddresses[SS58Encoder.NetworkPrefix.KILT] = kiltDidAddress
                 didDerivedAddresses[SS58Encoder.NetworkPrefix.POLKADOT] = polkadotDidAddress
+                didDerivedAddresses[SS58Encoder.NetworkPrefix.KUSAMA] = kusamaDidAddress
                 
                 Logger.success("WalletManager", "Direcciones DID derivadas generadas", 
-                    "KILT DID: ${kiltDidAddress.take(20)}..., Polkadot DID: ${polkadotDidAddress.take(20)}...")
+                    "KILT DID: ${kiltDidAddress.take(20)}..., Polkadot DID: ${polkadotDidAddress.take(20)}..., Kusama DID: ${kusamaDidAddress.take(20)}...")
             } else {
                 Logger.error("WalletManager", "Error generando keypair para derivación DID", "KeyPairInfo es null")
             }

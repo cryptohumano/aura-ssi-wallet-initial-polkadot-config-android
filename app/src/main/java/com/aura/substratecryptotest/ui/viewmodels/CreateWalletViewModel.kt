@@ -4,6 +4,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aura.substratecryptotest.data.WalletRepository
+// Removed UnifiedUserWalletService import
 import com.aura.substratecryptotest.utils.Logger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -111,35 +112,53 @@ class CreateWalletViewModel : ViewModel() {
     }
     
     /**
-     * Paso 4: Confirmar creación de wallet
+     * Paso 4: Confirmar creación de usuario completo con wallet
      */
-    fun confirmWalletCreation(walletName: String) {
+    fun confirmWalletCreation(userName: String) {
         val mnemonic = _uiState.value.generatedMnemonic ?: return
         
         _uiState.value = _uiState.value.copy(
             currentStep = CreateWalletStep.CREATING_WALLET,
-            walletName = walletName,
-            statusMessage = "Creando wallet: $walletName..."
+            walletName = userName,
+            statusMessage = "Creando usuario completo: $userName..."
         )
         
-        walletRepository.createFinalWallet(
-            walletName = walletName,
-            validatedMnemonic = mnemonic,
-            onSuccess = {
-                _uiState.value = _uiState.value.copy(
-                    currentStep = CreateWalletStep.COMPLETED,
-                    statusMessage = "¡Wallet creada exitosamente!"
-                )
+        viewModelScope.launch {
+            try {
+                Logger.debug("CreateWalletViewModel", "Creando usuario completo con wallet", "Nombre: $userName")
                 
-                Logger.success("CreateWalletViewModel", "Wallet creada", walletName)
-            },
-            onError = { error ->
+                // ✅ Crear usuario completo usando WalletRepository
+                val result = walletRepository.createCompleteUserWithWallet(userName)
+                
+                when {
+                    result.isSuccess -> {
+                        _uiState.value = _uiState.value.copy(
+                            currentStep = CreateWalletStep.COMPLETED,
+                            statusMessage = "¡Usuario y wallet creados exitosamente!",
+                            error = null
+                        )
+                        
+                        Logger.success("CreateWalletViewModel", "Usuario completo creado", 
+                            "Usuario: $userName")
+                    }
+                    result.isFailure -> {
+                        _uiState.value = _uiState.value.copy(
+                            error = "Error creando usuario: ${result.exceptionOrNull()?.message}",
+                            statusMessage = ""
+                        )
+                        
+                        Logger.error("CreateWalletViewModel", "Error creando usuario completo", result.exceptionOrNull()?.message ?: "Error desconocido", result.exceptionOrNull())
+                    }
+                }
+            } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    error = "Error creando wallet: $error",
+                    error = "Error inesperado: ${e.message}",
                     statusMessage = ""
                 )
+                
+                Logger.error("CreateWalletViewModel", "Error inesperado creando usuario", e.message ?: "Error desconocido", e)
             }
-        )
+        }
     }
     
     /**
@@ -179,5 +198,7 @@ data class CreateWalletUiState(
     val kiltAddress: String? = null,
     val walletName: String = "",
     val statusMessage: String = "",
-    val error: String? = null
+    val error: String? = null,
+    val createdUser: com.aura.substratecryptotest.security.UserManager.User? = null,
+    val createdWallet: com.aura.substratecryptotest.data.UserWallet? = null
 )

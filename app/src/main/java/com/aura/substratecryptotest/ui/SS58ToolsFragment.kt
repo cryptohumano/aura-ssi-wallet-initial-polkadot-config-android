@@ -264,3 +264,4 @@ class SS58ToolsFragment : Fragment() {
         _binding = null
     }
 }
+

@@ -8,3 +8,5 @@ enum class EncryptionAlgorithm {
     ED25519,    // Edwards curve Digital Signature Algorithm
     ECDSA       // Elliptic Curve Digital Signature Algorithm
 }
+
+

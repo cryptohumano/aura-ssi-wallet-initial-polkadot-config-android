@@ -9,6 +9,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Fingerprint
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import com.aura.substratecryptotest.security.BiometricManager
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +26,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aura.substratecryptotest.ui.viewmodels.CreateWalletViewModel
 import com.aura.substratecryptotest.ui.viewmodels.CreateWalletStep
+import androidx.compose.ui.res.stringResource
+import com.aura.substratecryptotest.R
+import com.aura.substratecryptotest.ui.context.LanguageAware
 
 /**
  * Pantalla para crear una nueva wallet
@@ -43,18 +51,19 @@ fun CreateWalletScreen(
         viewModel.generateMnemonic()
     }
     
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Crear Nueva Wallet") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+    LanguageAware {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.create_wallet_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.settings_back))
+                        }
                     }
-                }
-            )
-        }
-    ) { paddingValues ->
+                )
+            }
+        ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -122,14 +131,24 @@ fun CreateWalletScreen(
                 
                 CreateWalletStep.COMPLETED -> {
                     CompletedStep(
-                        onContinue = onWalletCreated
+                        onContinue = {
+                            // Pasar información del usuario creado
+                            val createdUser = uiState.createdUser
+                            val createdWallet = uiState.createdWallet
+                            if (createdUser != null && createdWallet != null) {
+                                android.util.Log.d("CreateWalletScreen", "Usuario creado: ${createdUser.name}")
+                                android.util.Log.d("CreateWalletScreen", "Wallet creada: ${createdWallet.name}")
+                            }
+                            onWalletCreated()
+                        }
                     )
                 }
                 
                 else -> {
-                    Text("Paso no implementado: ${uiState.currentStep}")
+                    Text(stringResource(R.string.create_wallet_step_not_implemented, uiState.currentStep.toString()))
                 }
             }
+        }
         }
     }
 }
@@ -140,24 +159,30 @@ private fun MnemonicDisplayStep(
     onContinue: (String) -> Unit
 ) {
     var userMnemonic by remember { mutableStateOf("") }
+    var showBiometricPrompt by remember { mutableStateOf(false) }
+    var biometricError by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val clipboardManager = remember { context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager }
+    val biometricManager = remember { BiometricManager(context) }
+    val activity = context as? FragmentActivity
     
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Paso 1: Valida tu Mnemonic",
+            text = stringResource(R.string.create_wallet_step1_title),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
         
         Text(
-            text = "Escribe las siguientes palabras en el orden correcto:",
+            text = stringResource(R.string.create_wallet_step1_subtitle),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center
         )
         
-        // Mostrar mnemonic generado
+        // Mostrar mnemonic generado con botón de copiar
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -166,11 +191,36 @@ private fun MnemonicDisplayStep(
                 modifier = Modifier.padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "Tu mnemonic:",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Tu mnemonic:",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    // Botón de copiar al portapapeles
+                    Button(
+                        onClick = {
+                            val clip = ClipData.newPlainText("mnemonic", mnemonic)
+                            clipboardManager.setPrimaryClip(clip)
+                        },
+                        modifier = Modifier.size(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copiar mnemonic",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
+                
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = mnemonic,
@@ -181,11 +231,91 @@ private fun MnemonicDisplayStep(
             }
         }
         
+        // Botón de autocompletar con biometría
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "🔐 Autenticación Biométrica",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Usa tu huella dactilar o reconocimiento facial para autocompletar el mnemonic",
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Button(
+                    onClick = { 
+                        if (activity != null && biometricManager.isBiometricAvailable()) {
+                            biometricManager.showBiometricPrompt(
+                                activity = activity,
+                                title = "Autenticación Biométrica",
+                                subtitle = "Confirma tu identidad para autocompletar el mnemonic",
+                                onSuccess = { 
+                                    userMnemonic = mnemonic
+                                    biometricError = null
+                                },
+                                onError = { error ->
+                                    biometricError = error
+                                },
+                                onCancel = {
+                                    biometricError = null
+                                }
+                            )
+                        } else {
+                            biometricError = "Biometría no disponible"
+                        }
+                    },
+                    enabled = activity != null && biometricManager.isBiometricAvailable(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Fingerprint,
+                        contentDescription = "Autenticación biométrica",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Autocompletar con Biometría")
+                }
+            }
+        }
+        
+        // Mostrar error de biometría si existe
+        biometricError?.let { error ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Text(
+                    text = "⚠️ $error",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+        }
+        
         // Campo para que el usuario escriba el mnemonic
         OutlinedTextField(
             value = userMnemonic,
             onValueChange = { userMnemonic = it },
-            label = { Text("Escribe el mnemonic aquí") },
+            label = { Text(stringResource(R.string.create_wallet_enter_mnemonic)) },
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
             maxLines = 3
@@ -198,7 +328,7 @@ private fun MnemonicDisplayStep(
         ) {
             Icon(Icons.Default.Check, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Validar Mnemonic")
+            Text(stringResource(R.string.create_wallet_validate_mnemonic))
         }
     }
 }
@@ -210,7 +340,7 @@ private fun DerivingAccountStep() {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Paso 2: Derivando Cuenta",
+            text = stringResource(R.string.create_wallet_step2_title),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
@@ -218,7 +348,7 @@ private fun DerivingAccountStep() {
         CircularProgressIndicator()
         
         Text(
-            text = "Generando tu dirección KILT...",
+            text = stringResource(R.string.create_wallet_step2_subtitle),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center
         )
@@ -230,25 +360,25 @@ private fun AddressConfirmationStep(
     kiltAddress: String,
     onConfirm: (String) -> Unit
 ) {
-    var walletName by remember { mutableStateOf("") }
+    var userName by remember { mutableStateOf("") }
     
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Paso 3: Confirma tu Dirección",
+            text = "Crear Usuario Completo",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
         
         Text(
-            text = "Esta es tu dirección KILT:",
+            text = "Ingresa un nombre para tu usuario. Se creará un usuario completo con wallet asociada.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center
         )
         
-        // Mostrar dirección KILT
+        // Mostrar dirección KILT que se generará
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
@@ -258,7 +388,7 @@ private fun AddressConfirmationStep(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Dirección KILT:",
+                    text = "Dirección KILT que se generará:",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -272,23 +402,23 @@ private fun AddressConfirmationStep(
             }
         }
         
-        // Campo para nombre de wallet
+        // Campo para nombre de usuario
         OutlinedTextField(
-            value = walletName,
-            onValueChange = { walletName = it },
-            label = { Text("Nombre de tu wallet") },
+            value = userName,
+            onValueChange = { userName = it },
+            label = { Text("Nombre de Usuario") },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Mi Wallet KILT") }
+            placeholder = { Text("Mi Usuario") }
         )
         
         Button(
-            onClick = { onConfirm(walletName) },
-            enabled = walletName.isNotBlank(),
+            onClick = { onConfirm(userName) },
+            enabled = userName.isNotBlank(),
             modifier = Modifier.fillMaxWidth()
         ) {
             Icon(Icons.Default.Check, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Crear Wallet")
+            Text("Crear Usuario Completo")
         }
     }
 }
@@ -300,7 +430,7 @@ private fun CreatingWalletStep() {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Paso 4: Creando Wallet",
+            text = "Creando Usuario Completo",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
@@ -308,7 +438,7 @@ private fun CreatingWalletStep() {
         CircularProgressIndicator()
         
         Text(
-            text = "Guardando tu wallet de forma segura...",
+            text = "Creando usuario en ambos sistemas y generando wallet segura...",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center
         )
@@ -324,7 +454,7 @@ private fun CompletedStep(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "¡Wallet Creada!",
+            text = stringResource(R.string.create_wallet_completed_title),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
@@ -337,7 +467,7 @@ private fun CompletedStep(
         )
         
         Text(
-            text = "Tu wallet ha sido creada exitosamente y guardada de forma segura.",
+            text = stringResource(R.string.create_wallet_completed_subtitle),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center
         )
@@ -346,7 +476,7 @@ private fun CompletedStep(
             onClick = onContinue,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continuar al Dashboard")
+            Text(stringResource(R.string.create_wallet_continue_dashboard))
         }
     }
 }

@@ -11,14 +11,22 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import com.aura.substratecryptotest.data.WalletState
+import com.aura.substratecryptotest.ui.lifecycle.rememberCurrentActivity
+import com.aura.substratecryptotest.ui.lifecycle.OnActivityChange
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aura.substratecryptotest.ui.viewmodels.DashboardViewModel
 import com.aura.substratecryptotest.ui.components.AccountSwitchModal
+import com.aura.substratecryptotest.ui.components.AuraBottomNavigationBar
+import androidx.compose.ui.res.stringResource
+import com.aura.substratecryptotest.R
+import com.aura.substratecryptotest.ui.context.LanguageAware
+import com.aura.substratecryptotest.data.wallet.WalletStateManager
 
 /**
  * Dashboard principal de la wallet
@@ -29,52 +37,132 @@ fun DashboardScreen(
     onNavigateToWalletInfo: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToDID: () -> Unit,
+    onNavigateToCredentials: () -> Unit,
+    onNavigateToDocuments: () -> Unit,
+    onNavigateToRWA: () -> Unit,
+    onLogout: () -> Unit,
     viewModel: DashboardViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val activity = context as FragmentActivity
     
+    // ✅ Monitorear wallet activa directamente en DashboardScreen
+    val walletStateManager = remember { WalletStateManager.getInstance(activity) }
+    var currentWalletState by remember { mutableStateOf<WalletState?>(null) }
+    
+    // ✅ Usar ActivityLifecycleComposables para monitorear activity activa
+    // val currentActivity = rememberCurrentActivity() // TODO: Implementar cuando esté listo
+    
     // Inicializar ViewModel
     LaunchedEffect(Unit) {
+        android.util.Log.d("DashboardScreen", "=== INICIALIZANDO DASHBOARDSCREEN ===")
         viewModel.initialize(activity)
     }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Aura Wallet") },
-                actions = {
-                    // Botón de switch accounts
-                    IconButton(onClick = { viewModel.showAccountSwitchModal() }) {
-                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = "Cambiar Cuenta")
-                    }
+    
+    // ✅ Monitorear cambios de activity usando OnActivityChange
+    // OnActivityChange { activity -> // TODO: Implementar cuando esté listo
+    //     android.util.Log.d("DashboardScreen", "=== ACTIVITY CAMBIÓ VIA OnActivityChange ===")
+    //     android.util.Log.d("DashboardScreen", "Nueva activity: ${activity?.javaClass?.simpleName}")
+    //     
+    //     if (activity != null) {
+    //         android.util.Log.d("DashboardScreen", "✅ Activity detectada: ${activity.javaClass.simpleName}")
+    //     }
+    // }
+    
+    // ✅ Monitorear cambios en la wallet activa
+    LaunchedEffect(Unit) {
+        walletStateManager.currentWallet.observeForever { walletState ->
+            android.util.Log.d("DashboardScreen", "=== WALLET STATE CAMBIÓ EN DASHBOARDSCREEN ===")
+            android.util.Log.d("DashboardScreen", "Nuevo estado: $walletState")
+            
+            currentWalletState = walletState
+            
+            when (walletState) {
+                is WalletState.Created -> {
+                    val wallet = walletState.wallet
+                    android.util.Log.d("DashboardScreen", "✅ Wallet activa detectada: ${wallet.name}")
+                    android.util.Log.d("DashboardScreen", "Dirección: ${wallet.address}")
+                    android.util.Log.d("DashboardScreen", "DID KILT: ${wallet.kiltDid}")
                     
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Configuración")
-                    }
+                    // Refrescar ViewModel cuando cambie la wallet
+                    viewModel.refreshWalletInfo()
                 }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToDID,
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.Person, contentDescription = "Gestión DID")
+                is WalletState.None -> {
+                    android.util.Log.d("DashboardScreen", "⚠️ No hay wallet activa")
+                }
+                is WalletState.Error -> {
+                    android.util.Log.e("DashboardScreen", "❌ Error en wallet: ${walletState.message}")
+                }
+                else -> {
+                    android.util.Log.d("DashboardScreen", "🔄 Estado de wallet: $walletState")
+                }
             }
+        }
+    }
+    
+    // Log para verificar datos del usuario
+    LaunchedEffect(uiState) {
+        android.util.Log.d("DashboardScreen", "=== DATOS EN DASHBOARDSCREEN ===")
+        android.util.Log.d("DashboardScreen", "Usuario actual: ${uiState.currentUser}")
+        android.util.Log.d("DashboardScreen", "Wallet principal: ${uiState.walletInfo?.name}")
+        android.util.Log.d("DashboardScreen", "Dirección Polkadot: ${uiState.polkadotAddress}")
+        android.util.Log.d("DashboardScreen", "Cantidad de wallets disponibles: ${uiState.availableWallets.size}")
+        android.util.Log.d("DashboardScreen", "Estado de wallet actual: $currentWalletState")
+        // android.util.Log.d("DashboardScreen", "Activity actual detectada: ${currentActivity?.javaClass?.simpleName}") // TODO: Implementar cuando esté listo
+    }
+    LanguageAware {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.dashboard_title)) },
+                    actions = {
+                        // Botón de switch accounts
+                        IconButton(onClick = { viewModel.showAccountSwitchModal() }) {
+                            Icon(Icons.Default.AccountBalanceWallet, contentDescription = stringResource(R.string.dashboard_settings))
+                        }
+                        
+                        // Botón de cerrar sesión
+                        IconButton(onClick = {
+                            android.util.Log.d("DashboardScreen", "=== BOTÓN LOGOUT PRESIONADO ===")
+                            android.util.Log.d("DashboardScreen", "Timestamp: ${System.currentTimeMillis()}")
+                            android.util.Log.d("DashboardScreen", "Stack trace: ${android.util.Log.getStackTraceString(Exception("Logout button pressed from:"))}")
+                            
+                            viewModel.logoutCurrentUser()
+                            onLogout()
+                        }) {
+                            Icon(Icons.Default.ExitToApp, contentDescription = "Cerrar sesión")
+                        }
+                        
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_title))
+                        }
+                    }
+                )
+            },
+        bottomBar = {
+            AuraBottomNavigationBar(
+                currentRoute = "dashboard",
+                onNavigateToWallet = { /* Ya estamos aquí */ },
+                onNavigateToIdentity = onNavigateToDID,
+                onNavigateToCredentials = onNavigateToCredentials,
+                onNavigateToDocuments = onNavigateToDocuments,
+                onNavigateToRWA = onNavigateToRWA
+            )
         }
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
+                .padding(paddingValues),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Saldo principal
             item {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -91,7 +179,7 @@ fun DashboardScreen(
                         )
                         
                         Text(
-                            text = if (uiState.walletInfo != null) "Wallet Activa" else "0.00 USDC",
+                            text = if (uiState.walletInfo != null) "1,250.50 USDC" else "0.00 USDC",
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -116,78 +204,41 @@ fun DashboardScreen(
                 }
             }
             
-            // Acciones rápidas
+            // Acciones rápidas del monedero
             item {
                 Text(
                     text = "Acciones Rápidas",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
             
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    QuickActionCard(
+                    QuickActionButton(
                         title = "Recibir",
                         icon = Icons.Default.CallReceived,
+                        onClick = { /* TODO: Implementar recibir */ },
                         modifier = Modifier.weight(1f)
                     )
                     
-                    QuickActionCard(
+                    QuickActionButton(
                         title = "Enviar",
                         icon = Icons.Default.Send,
+                        onClick = { /* TODO: Implementar enviar */ },
                         modifier = Modifier.weight(1f)
                     )
-                }
-            }
-            
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    QuickActionCard(
+                    
+                    QuickActionButton(
                         title = "Intercambiar",
                         icon = Icons.Default.SwapHoriz,
-                        modifier = Modifier.weight(1f)
-                    )
-                    
-                    QuickActionCard(
-                        title = "Staking",
-                        icon = Icons.Default.TrendingUp,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-            
-            // Acciones DID
-            item {
-                Text(
-                    text = "Identidad Digital",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-            
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    QuickActionCard(
-                        title = "Derivar DID",
-                        icon = Icons.Default.Fingerprint,
-                        modifier = Modifier.weight(1f)
-                    )
-                    
-                    QuickActionCard(
-                        title = "Ver DID",
-                        icon = Icons.Default.Person,
+                        onClick = { /* TODO: Implementar intercambiar */ },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -195,17 +246,10 @@ fun DashboardScreen(
             
             // Información de wallet
             item {
-                Text(
-                    text = "Información de Wallet",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-            
-            item {
                 Card(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
@@ -231,10 +275,12 @@ fun DashboardScreen(
                             )
                         }
                         
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = null
-                        )
+                        IconButton(onClick = onNavigateToWalletInfo) {
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                contentDescription = "Ver detalles"
+                            )
+                        }
                     }
                 }
             }
@@ -279,10 +325,57 @@ fun DashboardScreen(
             onWalletSelected = { walletName ->
                 viewModel.switchToWallet(walletName)
             },
+            onWalletDeleted = { walletName ->
+                viewModel.deleteWallet(walletName)
+            },
+            onWalletRenamed = { oldName, newName ->
+                viewModel.renameWallet(oldName, newName)
+            },
             onDismiss = {
                 viewModel.hideAccountSwitchModal()
+            },
+            onRefresh = {
+                viewModel.refreshAvailableAccounts()
             }
         )
+        }
+    }
+}
+
+@Composable
+private fun QuickActionButton(
+    title: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                icon,
+                contentDescription = title,
+                modifier = Modifier.size(24.dp)
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Text(
+                text = title,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 

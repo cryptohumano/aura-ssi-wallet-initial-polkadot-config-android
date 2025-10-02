@@ -19,3 +19,9 @@ val AuraSuccess = Color(0xFF10B981) // Emerald
 val AuraWarning = Color(0xFFF59E0B) // Amber
 val AuraError = Color(0xFFEF4444) // Red
 val AuraInfo = Color(0xFF3B82F6) // Blue
+
+
+
+
+
+

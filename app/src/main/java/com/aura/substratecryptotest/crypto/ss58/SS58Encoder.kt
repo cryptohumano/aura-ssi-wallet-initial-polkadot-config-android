@@ -124,38 +124,6 @@ class SS58Encoder {
     }
     
     /**
-     * Obtiene información detallada de una dirección SS58
-     * @param address Dirección SS58
-     * @return SS58AddressInfo con la información de la dirección
-     */
-    suspend fun getAddressInfo(address: String): SS58AddressInfo {
-        return withContext(Dispatchers.IO) {
-            try {
-                val publicKey = decode(address)
-                val networkPrefix = getNetworkPrefix(address)
-                val checksum = getChecksum(address)
-                val isValid = validateAddress(address)
-                
-                SS58AddressInfo(
-                    address = address,
-                    publicKey = publicKey,
-                    networkPrefix = networkPrefix,
-                    checksum = checksum,
-                    isValid = isValid
-                )
-            } catch (e: Exception) {
-                SS58AddressInfo(
-                    address = address,
-                    publicKey = ByteArray(0),
-                    networkPrefix = NetworkPrefix.CUSTOM,
-                    checksum = ByteArray(0),
-                    isValid = false
-                )
-            }
-        }
-    }
-    
-    /**
      * Valida una dirección SS58
      * @param address Dirección SS58 a validar
      * @return Boolean indicando si es válida
@@ -216,55 +184,6 @@ class SS58Encoder {
     }
     
     /**
-     * Obtiene el checksum de una dirección SS58
-     * @param address Dirección SS58
-     * @return ByteArray con el checksum
-     */
-    private suspend fun getChecksum(address: String): ByteArray {
-        return withContext(Dispatchers.IO) {
-            try {
-                // Usar el SDK real de Substrate para extraer el checksum
-                val decodedBytes = address.toAccountId()
-                val addressPrefix = address.addressPrefix()
-                
-                // Calcular el checksum usando la misma lógica que el SDK
-                val prefixBytes = when (addressPrefix.toInt()) {
-                    in 0..63 -> byteArrayOf(addressPrefix.toByte())
-                    in 64..16383 -> {
-                        val first = (addressPrefix.toInt() and 0b0000_0000_1111_1100) shr 2
-                        val second = (addressPrefix.toInt() shr 8) or ((addressPrefix.toInt() and 0b0000_0000_0000_0011) shl 6)
-                        byteArrayOf((first or 0b01000000).toByte(), second.toByte())
-                    }
-                    else -> byteArrayOf(addressPrefix.toByte())
-                }
-                
-                val prefix = "SS58PRE".toByteArray(Charsets.UTF_8)
-                val hash = (prefix + prefixBytes + decodedBytes).blake2b512()
-                hash.copyOfRange(0, 2) // Los primeros 2 bytes son el checksum
-            } catch (e: Exception) {
-                ByteArray(0)
-            }
-        }
-    }
-    
-    /**
-     * Convierte una dirección de una red a otra
-     * @param address Dirección SS58 original
-     * @param targetNetwork Red de destino
-     * @return String con la dirección en la nueva red
-     */
-    suspend fun convertToNetwork(address: String, targetNetwork: NetworkPrefix): String {
-        return withContext(Dispatchers.IO) {
-            try {
-                val publicKey = decode(address)
-                encode(publicKey, targetNetwork)
-            } catch (e: Exception) {
-                throw SS58Exception("Error convirtiendo dirección a red ${targetNetwork.name}: ${e.message}", e)
-            }
-        }
-    }
-    
-    /**
      * Genera múltiples direcciones para diferentes redes
      * @param publicKey Clave pública
      * @param networks Lista de redes
@@ -281,64 +200,6 @@ class SS58Encoder {
                 }
             } catch (e: Exception) {
                 throw SS58Exception("Error generando direcciones para múltiples redes: ${e.message}", e)
-            }
-        }
-    }
-    
-    /**
-     * Verifica si una dirección pertenece a una red específica
-     * @param address Dirección SS58
-     * @param network Red a verificar
-     * @return Boolean indicando si pertenece a la red
-     */
-    suspend fun isFromNetwork(address: String, network: NetworkPrefix): Boolean {
-        return withContext(Dispatchers.IO) {
-            try {
-                val addressNetwork = getNetworkPrefix(address)
-                addressNetwork == network
-            } catch (e: Exception) {
-                false
-            }
-        }
-    }
-    
-    /**
-     * Obtiene información de todas las redes soportadas
-     * @return Lista con información de las redes
-     */
-    fun getSupportedNetworks(): List<NetworkInfo> {
-        return NetworkPrefix.values().map { prefix ->
-            NetworkInfo(
-                prefix = prefix,
-                name = prefix.name,
-                value = prefix.value,
-                description = getNetworkDescription(prefix)
-            )
-        }
-    }
-    
-    /**
-     * Obtiene la descripción de una red
-     * @param network Red
-     * @return String con la descripción
-     */
-    private fun getNetworkDescription(network: NetworkPrefix): String {
-        return network.description
-    }
-    
-    /**
-     * Valida múltiples direcciones
-     * @param addresses Lista de direcciones SS58
-     * @return Map con el resultado de validación para cada dirección
-     */
-    suspend fun validateMultipleAddresses(addresses: List<String>): Map<String, Boolean> {
-        return withContext(Dispatchers.IO) {
-            try {
-                addresses.associateWith { address ->
-                    validateAddress(address)
-                }
-            } catch (e: Exception) {
-                addresses.associateWith { false }
             }
         }
     }
@@ -434,34 +295,51 @@ class SS58Encoder {
     }
     
     /**
-     * Verifica si una dirección es de una parachain específica
+     * Verifica si una dirección pertenece a una red específica
      * @param address Dirección SS58
-     * @param parachainName Nombre de la parachain
-     * @return Boolean indicando si pertenece a la parachain
+     * @param network Red a verificar
+     * @return Boolean indicando si pertenece a la red
      */
-    suspend fun isParachainAddress(address: String, parachainName: String): Boolean {
-        val network = findNetworkByName(parachainName)
-        return if (network != null) {
-            isFromNetwork(address, network)
-        } else {
-            false
+    suspend fun isFromNetwork(address: String, network: NetworkPrefix): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val addressNetwork = getNetworkPrefix(address)
+                addressNetwork == network
+            } catch (e: Exception) {
+                false
+            }
         }
     }
     
     /**
-     * Valida el checksum de una dirección SS58
-     * @param address Dirección SS58
-     * @return Boolean indicando si el checksum es válido
+     * Convierte una dirección de una red a otra
+     * @param address Dirección SS58 original
+     * @param targetNetwork Red de destino
+     * @return String con la dirección en la nueva red
      */
-    suspend fun validateChecksum(address: String): Boolean {
+    suspend fun convertToNetwork(address: String, targetNetwork: NetworkPrefix): String {
         return withContext(Dispatchers.IO) {
             try {
-                // Usar el SDK para validar el checksum
-                address.toAccountId() // Esto valida automáticamente el checksum
-                true
+                val publicKey = decode(address)
+                encode(publicKey, targetNetwork)
             } catch (e: Exception) {
-                false
+                throw SS58Exception("Error convirtiendo dirección a red ${targetNetwork.name}: ${e.message}", e)
             }
+        }
+    }
+    
+    /**
+     * Obtiene información de todas las redes soportadas
+     * @return Lista con información de las redes
+     */
+    fun getSupportedNetworks(): List<NetworkInfo> {
+        return NetworkPrefix.values().map { prefix ->
+            NetworkInfo(
+                prefix = prefix,
+                name = prefix.name,
+                value = prefix.value,
+                description = prefix.description
+            )
         }
     }
     
@@ -473,14 +351,13 @@ class SS58Encoder {
     suspend fun getChecksumInfo(address: String): ChecksumInfo {
         return withContext(Dispatchers.IO) {
             try {
-                val checksum = getChecksum(address)
-                val isValid = validateChecksum(address)
+                val isValid = validateAddress(address)
                 
                 ChecksumInfo(
-                    checksum = checksum,
+                    checksum = ByteArray(0),
                     isValid = isValid,
-                    checksumHex = checksum.joinToString("") { "%02x".format(it) },
-                    size = checksum.size
+                    checksumHex = "",
+                    size = 0
                 )
             } catch (e: Exception) {
                 ChecksumInfo(
@@ -494,30 +371,6 @@ class SS58Encoder {
     }
     
     /**
-     * Verifica si una dirección tiene un formato SS58 válido
-     * @param address Dirección SS58
-     * @return Boolean indicando si el formato es válido
-     */
-    suspend fun isValidSS58Format(address: String): Boolean {
-        return withContext(Dispatchers.IO) {
-            try {
-                // Verificar que no esté vacía
-                if (address.isBlank()) return@withContext false
-                
-                // Verificar que use caracteres Base58 válidos
-                val base58Pattern = Regex("^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$")
-                if (!base58Pattern.matches(address)) return@withContext false
-                
-                // Verificar que se puede decodificar
-                val decoded = address.toAccountId()
-                decoded.isNotEmpty()
-            } catch (e: Exception) {
-                false
-            }
-        }
-    }
-    
-    /**
      * Obtiene información completa de validación de una dirección
      * @param address Dirección SS58
      * @return AddressValidationInfo con toda la información de validación
@@ -525,8 +378,8 @@ class SS58Encoder {
     suspend fun getAddressValidationInfo(address: String): AddressValidationInfo {
         return withContext(Dispatchers.IO) {
             try {
-                val isValidFormat = isValidSS58Format(address)
-                val isValidChecksum = validateChecksum(address)
+                val isValidFormat = validateAddress(address)
+                val isValidChecksum = validateAddress(address)
                 val networkPrefix = getNetworkPrefix(address)
                 val checksumInfo = getChecksumInfo(address)
                 val publicKey = if (isValidFormat) decode(address) else ByteArray(0)
@@ -563,7 +416,7 @@ class SS58Encoder {
         val value: Int,
         val description: String
     )
-
+    
     /**
      * Información de checksum de una dirección SS58
      */

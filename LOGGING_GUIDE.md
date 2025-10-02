@@ -224,3 +224,5 @@ El nuevo sistema de logging proporciona:
 - ✅ Mejor debugging y troubleshooting
 
 Los logs ahora se mostrarán correctamente en Logcat y serán más fáciles de filtrar y analizar.
+
+

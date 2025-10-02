@@ -192,3 +192,5 @@ adb logcat | grep "Error de verificación"
 ---
 
 **Conclusión**: El sistema de verificación implementado te permite estar 100% seguro de que las claves generadas son correctas y compatibles con el ecosistema Substrate/Polkadot. Los logs detallados te ayudan a identificar cualquier problema rápidamente.
+
+

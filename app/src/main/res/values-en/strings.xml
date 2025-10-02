@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Substrate Crypto Test (Debug)</string>
+    
+    <!-- Tabs -->
+    <string name="tab_wallets">Wallets</string>
+    <string name="tab_wallet_info">Wallet Info</string>
+    <string name="tab_crypto_tools">Crypto Tools</string>
+    <string name="tab_import_export">Import/Export</string>
+    
+    <!-- Wallet Management -->
+    <string name="create_wallet">Create Wallet</string>
+    <string name="import_wallet">Import Wallet</string>
+    <string name="export_wallet">Export Wallet</string>
+    <string name="delete_wallet">Delete Wallet</string>
+    <string name="select_wallet">Select Wallet</string>
+    
+    <!-- Crypto Tools -->
+    <string name="generate_mnemonic">Generate Mnemonic</string>
+    <string name="validate_mnemonic">Validate Mnemonic</string>
+    <string name="generate_hash">Generate Hash</string>
+    <string name="sign_message">Sign Message</string>
+    
+    <!-- Hash Types -->
+    <string name="hash_sha256">SHA256</string>
+    <string name="hash_keccak256">Keccak256</string>
+    <string name="hash_blake2b256">Blake2b256</string>
+    <string name="hash_blake2b512">Blake2b512</string>
+    <string name="hash_xxhash64">XXHash64</string>
+    <string name="hash_xxhash128">XXHash128</string>
+    
+    <!-- Mnemonic Lengths -->
+    <string name="mnemonic_12_words">12 words</string>
+    <string name="mnemonic_15_words">15 words</string>
+    <string name="mnemonic_18_words">18 words</string>
+    <string name="mnemonic_21_words">21 words</string>
+    <string name="mnemonic_24_words">24 words</string>
+    
+    <!-- Crypto Types -->
+    <string name="crypto_sr25519">SR25519</string>
+    <string name="crypto_ed25519">ED25519</string>
+    <string name="crypto_ecdsa">ECDSA</string>
+    
+    <!-- Messages -->
+    <string name="wallet_created_successfully">Wallet created successfully</string>
+    <string name="wallet_imported_successfully">Wallet imported successfully</string>
+    <string name="wallet_exported_successfully">Wallet exported successfully</string>
+    <string name="wallet_deleted_successfully">Wallet deleted successfully</string>
+    <string name="mnemonic_generated_successfully">Mnemonic generated successfully</string>
+    <string name="mnemonic_valid">Valid mnemonic</string>
+    <string name="mnemonic_invalid">Invalid mnemonic</string>
+    <string name="hash_generated_successfully">Hash generated successfully</string>
+    <string name="message_signed_successfully">Message signed successfully</string>
+    
+    <!-- Errors -->
+    <string name="error_generic">An error has occurred</string>
+    <string name="error_invalid_mnemonic">Invalid mnemonic</string>
+    <string name="error_no_wallet_selected">No wallet selected</string>
+    <string name="error_import_failed">Failed to import wallet</string>
+    <string name="error_export_failed">Failed to export wallet</string>
+    
+    <!-- Hints -->
+    <string name="hint_wallet_name">Wallet name</string>
+    <string name="hint_password">Password (optional)</string>
+    <string name="hint_mnemonic">Mnemonic</string>
+    <string name="hint_message">Message</string>
+    <string name="hint_data">Data</string>
+    <string name="hint_json">JSON</string>
+    
+    <!-- Empty States -->
+    <string name="no_wallets_created">No wallets created</string>
+    <string name="no_wallet_selected">No wallet selected</string>
+    
+    <!-- Dashboard -->
+    <string name="dashboard_title">Aura Wallet</string>
+    <string name="dashboard_welcome">Welcome</string>
+    <string name="dashboard_balance">Balance</string>
+    <string name="dashboard_transactions">Transactions</string>
+    <string name="dashboard_settings">Settings</string>
+    <string name="dashboard_did">Digital Identity</string>
+    <string name="dashboard_credentials">Credentials</string>
+    <string name="dashboard_documents">Documents</string>
+    <string name="dashboard_rwa">Real World Assets</string>
+    
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_currency">Currency</string>
+    <string name="settings_developer_mode">Developer Mode</string>
+    <string name="settings_developer_tools">Debug Tools</string>
+    <string name="settings_user_info">User Information</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_enable_debug">Enable debug tools</string>
+    <string name="settings_debug_description">Enables development and debug tools</string>
+    
+    <!-- Language Options -->
+    <string name="language_spanish">Español</string>
+    <string name="language_english">English</string>
+    <string name="language_auto">Auto</string>
+    
+    <!-- Currency Options -->
+    <string name="currency_usdc">USDC</string>
+    <string name="currency_mxn">MXN</string>
+    <string name="currency_clp">CLP</string>
+    
+    <!-- Common Actions -->
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_share">Share</string>
+    <string name="action_copy">Copy</string>
+    
+    <!-- Status Messages -->
+    <string name="status_loading">Loading...</string>
+    <string name="status_success">Success</string>
+    <string name="status_error">Error</string>
+    <string name="status_warning">Warning</string>
+    <string name="status_info">Information</string>
+    
+    <!-- Debug Tools -->
+    <string name="debug_diagnose_data">🔍 Diagnose Previous Data</string>
+    <string name="debug_migrate_user">🔄 Migrate Previous User</string>
+    <string name="debug_test_api">🧪 API Client Test</string>
+    <string name="debug_view_logs">📋 View Migration Logs</string>
+    
+    <!-- User Info -->
+    <string name="user_info_title">👤 User Information</string>
+    <string name="user_current">👤 CURRENT USER:</string>
+    <string name="user_logbooks">📚 LOGBOOKS:</string>
+    <string name="user_use_debug">🔍 Use debug tools for more information</string>
+    
+    <!-- Migration Messages -->
+    <string name="migration_starting">Starting migration...</string>
+    <string name="migration_success">Migration completed successfully</string>
+    <string name="migration_failed">Migration error</string>
+    <string name="migration_no_data">No data to migrate</string>
+    
+    <!-- API Test Messages -->
+    <string name="api_test_success">✅ ALL TESTS PASSED</string>
+    <string name="api_test_failed">❌ SOME TESTS FAILED</string>
+    <string name="api_working_correctly">🎉 API Client working correctly</string>
+    <string name="api_check_logs">Check logs with: adb logcat -s DidApiTest</string>
+    
+    <!-- Logs Messages -->
+    <string name="logs_title">=== MIGRATION LOGS ===</string>
+    <string name="logs_android_studio">📱 TO VIEW COMPLETE LOGS:</string>
+    <string name="logs_studio_steps">1. Android Studio → Logcat</string>
+    <string name="logs_filter_tags">2. Filter by tags:</string>
+    <string name="logs_terminal">3. Terminal (ADB):</string>
+    
+    <!-- Welcome Screen -->
+    <string name="welcome_title">Welcome to Aura Wallet!</string>
+    <string name="welcome_subtitle">Select your preferred language to get started</string>
+    <string name="welcome_select_language">Select your language</string>
+    <string name="welcome_continue">Continue</string>
+    
+    <!-- Create Wallet Screen -->
+    <string name="create_wallet_title">Create New Wallet</string>
+    <string name="create_wallet_step1_title">Step 1: Validate your Mnemonic</string>
+    <string name="create_wallet_step1_subtitle">Write the following words in the correct order:</string>
+    <string name="create_wallet_step2_title">Step 2: Deriving Account</string>
+    <string name="create_wallet_step2_subtitle">Generating your wallet address...</string>
+    <string name="create_wallet_step3_title">Step 3: Confirm Address</string>
+    <string name="create_wallet_step3_subtitle">Confirm this is your wallet address:</string>
+    <string name="create_wallet_step4_title">Step 4: Creating Wallet</string>
+    <string name="create_wallet_step4_subtitle">Saving your wallet securely...</string>
+    <string name="create_wallet_completed_title">Wallet Created!</string>
+    <string name="create_wallet_completed_subtitle">Your wallet has been created successfully and saved securely.</string>
+    <string name="create_wallet_continue_dashboard">Continue to Dashboard</string>
+    <string name="create_wallet_copy_mnemonic">Copy Mnemonic</string>
+    <string name="create_wallet_validate_mnemonic">Validate Mnemonic</string>
+    <string name="create_wallet_confirm_address">Confirm Address</string>
+    <string name="create_wallet_wallet_name">Wallet name</string>
+    <string name="create_wallet_enter_mnemonic">Write the mnemonic here...</string>
+    <string name="create_wallet_mnemonic_copied">Mnemonic copied to clipboard</string>
+    <string name="create_wallet_mnemonic_valid">Valid mnemonic</string>
+    <string name="create_wallet_mnemonic_invalid">Invalid mnemonic</string>
+    <string name="create_wallet_step_not_implemented">Step not implemented: %s</string>
+    
+    <!-- Import Wallet Screen -->
+    <string name="import_wallet_title">Import Wallet</string>
+    <string name="import_wallet_development">🚧 In Development</string>
+    <string name="import_wallet_development_message">The import wallet functionality\nis under development</string>
+    <string name="import_wallet_back">Back</string>
+    
+    <!-- DID Dashboard Screen -->
+    <string name="did_dashboard_title">Digital Identity</string>
+    <string name="did_dashboard_back">Back</string>
+    <string name="did_dashboard_refresh">Refresh</string>
+    <string name="did_dashboard_derive_did">Derive DID</string>
+    <string name="did_dashboard_edit_profile">Edit profile</string>
+    <string name="did_dashboard_did_info">DID Information</string>
+    <string name="did_dashboard_interactions">Interactions</string>
+    
+    <!-- Documents Screen -->
+    <string name="documents_title">Documents</string>
+    <string name="documents_all">All</string>
+    <string name="documents_active_only">Active Only</string>
+    <string name="documents_close">Close</string>
+    <string name="documents_view_pdf">View PDF</string>
+    <string name="documents_ok">OK</string>
+    <string name="documents_please_wait">Please wait...</string>
+    <string name="documents_quick_view">Quick View</string>
+    <string name="documents_generate_pdf">Generate PDF</string>
+    <string name="documents_edit">Edit</string>
+    <string name="documents_delete_confirm">Are you sure you want to delete the logbook \"%s\"? This action cannot be undone.</string>
+    <string name="documents_cancel">Cancel</string>
+    <string name="documents_delete">Delete</string>
+    
+    <!-- Credentials Screen -->
+    <string name="credentials_title">Credentials</string>
+    <string name="credentials_view">View</string>
+    <string name="credentials_present">Present</string>
+    <string name="credentials_update">Update</string>
+    <string name="credentials_revoke">Revoke</string>
+    
+    <!-- RWA Screen -->
+    <string name="rwa_title">RWA - Real World Assets</string>
+    <string name="rwa_register_asset">Register %s</string>
+    
+    <!-- Wallet Info Screen -->
+    <string name="wallet_info_title">Wallet Information</string>
+    <string name="wallet_info_back">Back</string>
+    
+</resources>

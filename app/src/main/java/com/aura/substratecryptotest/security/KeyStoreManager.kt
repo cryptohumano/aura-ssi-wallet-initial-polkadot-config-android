@@ -41,9 +41,9 @@ class KeyStoreManager(private val context: Context) {
     }
     
     /**
-     * Genera una clave AES para encriptación
+     * Genera una clave AES para encriptación con autenticación biométrica requerida
      */
-    private fun generateSecretKey(alias: String): SecretKey {
+    private fun generateSecretKey(alias: String, requireBiometric: Boolean = true): SecretKey {
         val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
         
         val keyGenParameterSpec = KeyGenParameterSpec.Builder(
@@ -52,35 +52,36 @@ class KeyStoreManager(private val context: Context) {
         )
             .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-            .setUserAuthenticationRequired(false) // Temporalmente sin autenticación
-            .setUserAuthenticationValidityDurationSeconds(0) // Sin duración de autenticación
+            .setUserAuthenticationRequired(requireBiometric) // Requerir autenticación biométrica
+            .setUserAuthenticationValidityDurationSeconds(if (requireBiometric) 30 else 0) // 30 segundos de validez
             .setInvalidatedByBiometricEnrollment(false)
+            .setKeySize(256)
             .build()
         
         keyGenerator.init(keyGenParameterSpec)
         val secretKey = keyGenerator.generateKey()
         
-        Logger.success(TAG, "Clave secreta generada", "Alias: $alias")
+        Logger.success(TAG, "Clave secreta generada", "Alias: $alias, Biometric: $requireBiometric")
         return secretKey
     }
     
     /**
      * Obtiene una clave existente o genera una nueva
      */
-    private fun getOrCreateSecretKey(alias: String): SecretKey {
+    private fun getOrCreateSecretKey(alias: String, requireBiometric: Boolean = true): SecretKey {
         return if (keyStore.containsAlias(alias)) {
             keyStore.getKey(alias, null) as SecretKey
         } else {
-            generateSecretKey(alias)
+            generateSecretKey(alias, requireBiometric)
         }
     }
     
     /**
      * Encripta datos usando AES-GCM
      */
-    fun encryptData(data: ByteArray, alias: String): EncryptedData? {
+    fun encryptData(data: ByteArray, alias: String, requireBiometric: Boolean = true): EncryptedData? {
         return try {
-            val secretKey = getOrCreateSecretKey(alias)
+            val secretKey = getOrCreateSecretKey(alias, requireBiometric)
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.ENCRYPT_MODE, secretKey)
             
@@ -90,7 +91,7 @@ class KeyStoreManager(private val context: Context) {
             val encryptedDataBase64 = Base64.encodeToString(encryptedData, Base64.DEFAULT)
             val ivBase64 = Base64.encodeToString(iv, Base64.DEFAULT)
             
-            Logger.success(TAG, "Datos encriptados exitosamente", "Alias: $alias, Size: ${data.size} bytes")
+            Logger.success(TAG, "Datos encriptados exitosamente", "Alias: $alias, Size: ${data.size} bytes, Biometric: $requireBiometric")
             
             EncryptedData(
                 encryptedData = encryptedDataBase64,
@@ -268,6 +269,144 @@ class KeyStoreManager(private val context: Context) {
             Logger.error(TAG, "Error limpiando datos", e.message ?: "Error desconocido", e)
             false
         }
+    }
+    
+    /**
+     * Almacena mnemonic de usuario específico
+     */
+    fun storeUserMnemonic(userId: String, mnemonic: String): Boolean {
+        return try {
+            val alias = "${userId}_mnemonic"
+            val encryptedData = encryptData(mnemonic.toByteArray(), alias, requireBiometric = true)
+            if (encryptedData != null) {
+                val prefs = context.getSharedPreferences("secure_storage_$userId", Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putString("mnemonic_encrypted", encryptedData.encryptedData)
+                    .putString("mnemonic_iv", encryptedData.iv)
+                    .apply()
+                
+                Logger.success(TAG, "Mnemonic de usuario almacenado", "Usuario: ${userId.take(8)}..., Alias: $alias")
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            Logger.error(TAG, "Error almacenando mnemonic de usuario", e.message ?: "Error desconocido", e)
+            false
+        }
+    }
+    
+    /**
+     * Recupera mnemonic de usuario específico
+     */
+    fun retrieveUserMnemonic(userId: String): String? {
+        return try {
+            val prefs = context.getSharedPreferences("secure_storage_$userId", Context.MODE_PRIVATE)
+            val encryptedData = prefs.getString("mnemonic_encrypted", null)
+            val iv = prefs.getString("mnemonic_iv", null)
+            
+            if (encryptedData != null && iv != null) {
+                val alias = "${userId}_mnemonic"
+                val encryptedDataObj = EncryptedData(
+                    encryptedData = encryptedData,
+                    iv = iv,
+                    alias = alias
+                )
+                
+                val decryptedBytes = decryptData(encryptedDataObj)
+                decryptedBytes?.toString(Charsets.UTF_8)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Logger.error(TAG, "Error recuperando mnemonic de usuario", e.message ?: "Error desconocido", e)
+            null
+        }
+    }
+    
+    /**
+     * Almacena clave privada de usuario específico
+     */
+    fun storeUserPrivateKey(userId: String, walletId: String, privateKey: ByteArray): Boolean {
+        return try {
+            val alias = "${userId}_${walletId}_private_key"
+            val encryptedData = encryptData(privateKey, alias, requireBiometric = true)
+            if (encryptedData != null) {
+                val prefs = context.getSharedPreferences("secure_storage_$userId", Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putString("${walletId}_private_key_encrypted", encryptedData.encryptedData)
+                    .putString("${walletId}_private_key_iv", encryptedData.iv)
+                    .apply()
+                
+                Logger.success(TAG, "Clave privada de usuario almacenada", "Usuario: ${userId.take(8)}..., Wallet: ${walletId.take(8)}...")
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            Logger.error(TAG, "Error almacenando clave privada de usuario", e.message ?: "Error desconocido", e)
+            false
+        }
+    }
+    
+    /**
+     * Recupera clave privada de usuario específico
+     */
+    fun retrieveUserPrivateKey(userId: String, walletId: String): ByteArray? {
+        return try {
+            val prefs = context.getSharedPreferences("secure_storage_$userId", Context.MODE_PRIVATE)
+            val encryptedData = prefs.getString("${walletId}_private_key_encrypted", null)
+            val iv = prefs.getString("${walletId}_private_key_iv", null)
+            
+            if (encryptedData != null && iv != null) {
+                val alias = "${userId}_${walletId}_private_key"
+                val encryptedDataObj = EncryptedData(
+                    encryptedData = encryptedData,
+                    iv = iv,
+                    alias = alias
+                )
+                
+                decryptData(encryptedDataObj)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Logger.error(TAG, "Error recuperando clave privada de usuario", e.message ?: "Error desconocido", e)
+            null
+        }
+    }
+    
+    /**
+     * Elimina todos los datos de un usuario específico
+     */
+    fun clearUserData(userId: String): Boolean {
+        return try {
+            val prefs = context.getSharedPreferences("secure_storage_$userId", Context.MODE_PRIVATE)
+            prefs.edit().clear().apply()
+            
+            // Eliminar claves del KeyStore que empiecen con el userId
+            val aliases = keyStore.aliases()
+            while (aliases.hasMoreElements()) {
+                val alias = aliases.nextElement()
+                if (alias.startsWith("${userId}_")) {
+                    keyStore.deleteEntry(alias)
+                }
+            }
+            
+            Logger.success(TAG, "Datos de usuario eliminados", "Usuario: ${userId.take(8)}...")
+            true
+        } catch (e: Exception) {
+            Logger.error(TAG, "Error eliminando datos de usuario", e.message ?: "Error desconocido", e)
+            false
+        }
+    }
+    
+    /**
+     * Verifica si un usuario tiene datos almacenados
+     */
+    fun hasUserData(userId: String): Boolean {
+        val prefs = context.getSharedPreferences("secure_storage_$userId", Context.MODE_PRIVATE)
+        return prefs.getString("mnemonic_encrypted", null) != null
     }
     
     /**

@@ -15,9 +15,12 @@ import androidx.lifecycle.lifecycleScope
 import com.aura.substratecryptotest.MainActivity
 import com.aura.substratecryptotest.databinding.FragmentWalletInfoBinding
 import com.aura.substratecryptotest.wallet.WalletManager
-import com.aura.substratecryptotest.wallet.WalletInfo
+import com.aura.substratecryptotest.wallet.WalletInfo as WalletWalletInfo
 import com.aura.substratecryptotest.crypto.ss58.SS58Encoder
 import com.aura.substratecryptotest.utils.Logger
+import com.aura.substratecryptotest.security.UserManager
+import com.aura.substratecryptotest.data.user.UserManagementService
+import com.aura.substratecryptotest.data.database.AppDatabaseManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -29,6 +32,8 @@ class WalletInfoFragment : Fragment() {
     
     private lateinit var walletManager: WalletManager
     private lateinit var ss58Encoder: SS58Encoder
+    private lateinit var userManager: UserManager
+    private lateinit var appDatabaseManager: AppDatabaseManager
     
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -48,6 +53,10 @@ class WalletInfoFragment : Fragment() {
         
         // Inicializar SS58Encoder
         ss58Encoder = SS58Encoder()
+        
+        // Inicializar componentes de usuario
+        userManager = UserManager(requireContext())
+        appDatabaseManager = AppDatabaseManager(requireContext())
         
         setupUI()
         observeWalletChanges()
@@ -125,15 +134,29 @@ class WalletInfoFragment : Fragment() {
         }
     }
     
-    private fun displayWalletInfo(walletInfo: WalletInfo) {
+    private fun displayWalletInfo(walletInfo: WalletWalletInfo) {
         Logger.debug("WalletInfoFragment", "Actualizando UI", "DID: ${walletInfo.kiltDid ?: "null"}, Address: ${walletInfo.kiltAddress ?: "null"}")
         
-        // Información básica
+        // Obtener información del usuario actual
+        val currentUser = userManager.getCurrentUser()
+        val userManagementService = appDatabaseManager.userManagementService
+        
+        Logger.debug("WalletInfoFragment", "Usuario actual", "User: ${currentUser?.name ?: "null"}, ID: ${currentUser?.id ?: "null"}")
+        
+        // Información básica de la wallet
         binding.textWalletName.text = walletInfo.name
         binding.textWalletId.text = "ID: ${walletInfo.id}"
         binding.textCryptoType.text = "Tipo: ${walletInfo.cryptoType}"
         binding.textDerivationPath.text = "Ruta: ${walletInfo.getFormattedDerivationPath()}"
         binding.textCreatedAt.text = "Creado: ${walletInfo.getFormattedCreatedAt()}"
+        
+        // Información del usuario (si está disponible)
+        if (currentUser != null) {
+            binding.textWalletName.text = "${walletInfo.name} (Usuario: ${currentUser.name})"
+            Logger.debug("WalletInfoFragment", "Usuario encontrado", "Nombre: ${currentUser.name}, ID: ${currentUser.id}")
+        } else {
+            Logger.warning("WalletInfoFragment", "No hay usuario actual", "La wallet existe pero no hay usuario asociado")
+        }
         
         // Mnemonic formateado
         binding.textMnemonicFormatted.text = walletInfo.getFormattedMnemonic()
@@ -145,6 +168,9 @@ class WalletInfoFragment : Fragment() {
         // Dirección principal (Substrate base)
         binding.textAddress.text = "Substrate: ${walletInfo.address}"
         
+        // Mostrar información del usuario actual
+        displayUserInfo(currentUser)
+        
         // Mostrar información del DID KILT si está disponible (PRIMERO)
         displayKiltDidInfo(walletInfo)
         
@@ -154,6 +180,28 @@ class WalletInfoFragment : Fragment() {
         // Mostrar el contenedor de información
         binding.containerWalletInfo.visibility = View.VISIBLE
         binding.containerNoWallet.visibility = View.GONE
+    }
+    
+    /**
+     * Muestra información del usuario actual
+     */
+    private fun displayUserInfo(currentUser: com.aura.substratecryptotest.security.UserManager.User?) {
+        if (currentUser != null) {
+            Logger.debug("WalletInfoFragment", "Mostrando información de usuario", "Nombre: ${currentUser.name}, ID: ${currentUser.id}")
+            
+            // Mostrar información del usuario en el log para debugging
+            Logger.debug("WalletInfoFragment", "=== INFORMACIÓN DE USUARIO ===", "")
+            Logger.debug("WalletInfoFragment", "Nombre de usuario", currentUser.name)
+            Logger.debug("WalletInfoFragment", "ID de usuario", currentUser.id)
+            Logger.debug("WalletInfoFragment", "Biometric ID", currentUser.biometricId)
+            Logger.debug("WalletInfoFragment", "Fecha de creación", currentUser.createdAt.toString())
+            Logger.debug("WalletInfoFragment", "Estado activo", currentUser.isActive.toString())
+            
+            // Si hay campos de texto disponibles en el layout, actualizarlos
+            // Por ahora solo loggeamos la información
+        } else {
+            Logger.warning("WalletInfoFragment", "No hay usuario actual", "La wallet existe pero no hay usuario asociado")
+        }
     }
     
     /**
@@ -417,7 +465,7 @@ class WalletInfoFragment : Fragment() {
     /**
      * Muestra la información del DID KILT si está disponible
      */
-    private fun displayKiltDidInfo(walletInfo: WalletInfo) {
+    private fun displayKiltDidInfo(walletInfo: WalletWalletInfo) {
         if (walletInfo.kiltDid != null && walletInfo.kiltAddress != null) {
             binding.textKiltDidInfo.text = walletInfo.kiltDid
             binding.textKiltDidAddress.text = "KILT (//did//0): ${walletInfo.kiltAddress}"
@@ -429,9 +477,13 @@ class WalletInfoFragment : Fragment() {
             
             // Agregar botón de prueba de encriptación
             binding.btnTestEncryption.visibility = View.VISIBLE
-            binding.btnTestEncryption.setOnClickListener {
-                testEncryptionManager()
-            }
+        binding.btnTestEncryption.setOnClickListener {
+            testEncryptionManager()
+        }
+        
+        binding.btnTestApiClient.setOnClickListener {
+            testApiClient()
+        }
         } else {
             binding.textKiltDidInfo.text = "DID no derivado aún"
             binding.textKiltDidAddress.text = "KILT (//did//0): No disponible"
@@ -614,6 +666,44 @@ class WalletInfoFragment : Fragment() {
                 // Restaurar botón
                 binding.btnTestKiltSignature.isEnabled = true
                 binding.btnTestKiltSignature.text = "Probar Firma"
+            }
+        }
+    }
+    
+    private fun testApiClient() {
+        val currentWallet = walletManager.currentWallet.value
+        if (currentWallet == null) {
+            showErrorDialog("Error", "No hay wallet disponible para probar API Client")
+            return
+        }
+        
+        // Mostrar loading
+        binding.btnTestApiClient.isEnabled = false
+        binding.btnTestApiClient.text = "Probando..."
+        
+        // Ejecutar prueba en background
+        lifecycleScope.launch {
+            try {
+                Logger.debug("WalletInfoFragment", "🧪 Iniciando prueba de API Client", "Wallet: ${currentWallet.name}")
+                
+                val apiTest = com.aura.substratecryptotest.api.DidApiTest(requireContext())
+                val success = apiTest.runBasicTests()
+                
+                // Limpiar sesión después de los tests
+                apiTest.cleanup()
+                
+                if (success) {
+                    showSuccessDialog("✅ API Client", "Tests básicos pasaron correctamente")
+                } else {
+                    showErrorDialog("❌ API Client", "Algunos tests fallaron")
+                }
+            } catch (e: Exception) {
+                Logger.error("WalletInfoFragment", "Error en prueba de API Client", e.message ?: "Error desconocido", e)
+                showErrorDialog("❌ Error", "Error ejecutando tests: ${e.message}")
+            } finally {
+                // Restaurar botón
+                binding.btnTestApiClient.isEnabled = true
+                binding.btnTestApiClient.text = "🌐 Probar API Client"
             }
         }
     }

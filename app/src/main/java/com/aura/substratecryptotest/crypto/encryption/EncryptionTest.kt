@@ -94,7 +94,8 @@ class EncryptionTest(private val context: Context) {
         return try {
             Logger.debug(TAG, "🧪 Iniciando tests de sesión", "Verificando SessionManager")
             
-            val sessionManager = SessionManager(context)
+            val walletManager = com.aura.substratecryptotest.wallet.WalletManager(context)
+            val sessionManager = SessionManager(context, walletManager)
             
             runBlocking {
                 // Test de autenticación con challenge simulado
